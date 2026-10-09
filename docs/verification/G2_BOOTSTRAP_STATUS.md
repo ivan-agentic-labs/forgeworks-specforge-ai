@@ -1,12 +1,9 @@
-# G2 bootstrap status — 9 October 2026
+# G2 bootstrap status — 2026-10-09
 
-Owner: `ivan-agentic-labs`. Five independent private repositories are authorized.
-G1 owner design approval permits bootstrap; historical conditional review text remains baseline evidence. **G1-D remains CONDITIONAL / NOT SIGNED and G1-E remains OPEN/BLOCKED** until all required runtime evidence and reviewer decisions are accepted.
+Owner: `ivan-agentic-labs`. Repository bootstrap and scoped engineering verification are complete for the tested source receipt. Engineering now proceeds directly on main under the latest owner authorization. The repository remains private and independent.
 
-On current `main` SHA `4bbaa2c55f4958509108880967cf207c50390714`, the independent OpenAPI validator, static contract/event checks, application CI, and a disposable PostgreSQL DDL plus bounded non-owner two-tenant RLS probe passed. Local product pytest also passes the current synthetic API/UI, auth/tenant-negative, worker-reliability, and artifact/integrity tests. These are partial, bounded evidence; details and exact run links are in `docs/evidence/G1_RUNTIME_EVIDENCE.md`.
+Current evidence and exact commit/run links: [CURRENT_GATE_EVIDENCE.md](CURRENT_GATE_EVIDENCE.md) and [main source receipt](../evidence/MAIN_VERIFICATION_2026-10-09.json). Historical receipts retain their original scope.
 
-Generated-client compilation, full PostgreSQL RLS CRUD/context-reset/bypass/concurrency coverage, real IdP/OIDC, browser sandbox/egress, external storage, legal/domain/operations/cost signoff, production backup/restore, and independent reviewer approval remain **NOT_RUN or BLOCKED**. No production deployment or customer data is authorized.
+Contracts/client compilation, complete application tests, implemented PostgreSQL MVP runtime with negative RLS/concurrency checks and disposable logical restore have passed. These are scoped results; G1-E remains OPEN/BLOCKED. Real identities/BFF, external storage/source ingestion, sandbox/provider/product GitHub App effects, PITR/load/regional recovery and independent acceptance remain unfinished or blocked. No production deployment or customer data is used.
 
-APIShield is the first implementation priority AFTER remote bootstrap and CI verification.
-
-The PostgreSQL workflow uses an intentionally public, disposable localhost-only test password. This is not a production credential. Never reuse it outside the isolated test service.
+CI database credentials are intentionally synthetic and confined to fresh disposable localhost services.

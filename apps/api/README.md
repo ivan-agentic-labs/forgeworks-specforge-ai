@@ -1,14 +1,11 @@
-# SpecForge API disposable hardening slice
+# SpecForge AI API runtime
 
-The FastAPI app now exercises the MVP workflow with a SQLite disposable store:
+Deterministic requirement/ambiguity/decision/revision/traceability/approval workflow. source_artifact_id is not real source extraction; external artifact bytes remain quarantined.
 
-- optimistic ambiguity/revision approval versions with full stale invalidation;
-- independent, pure OpenAPI semantic validation and canonical report digests;
-- requirement-to-operation and acceptance-case traceability;
-- artifact digest/object-generation records that remain quarantined without a configured scanner;
-- durable job state, attempt counters, backoff timestamps, and terminal retry budgets.
+Install with `python -m pip install -e 'apps/api[test]'`. Run `uvicorn specforge_ai.main:app` after configuring authentication and persistence. Required auth configuration is documented in `.env.example`: issuer/audience and either trusted OIDC HTTPS JWKS configuration or explicit development/test authentication. Development auth requires an explicit separate secret; there is no shared-secret fallback.
 
-Generated documents explicitly carry `x-deterministic-output: true` and
-`x-generator: specforge-ai.deterministic.v1`. No paid provider or external
-model is called. The PostgreSQL migration and storage/scanner integration remain
-candidate/non-production evidence items; this is not a production-ready claim.
+Set `SPECFORGE_DATABASE_URL` to select PostgreSQL. Apply migrations under `migrations/versions` in order using the separate migration/provisioning role. Runtime login must be a non-owner member of the product tenant role and have no superuser/BYPASSRLS/CREATEROLE/CREATEDB privileges. Runtime cannot own product or tenant/provisioning tables. Identities require provisioned internal UUID mapping. SQLite is restricted to development/test; PostgreSQL runtime refuses fixture identity seeding.
+
+The dedicated `.github/workflows/runtime-postgres.yml` verifies a fresh disposable database, product runtime commands, tenant boundaries/concurrency and logical restore. Candidate SQL under docs/verification/sql-candidates is not auto-applied. No real provider call, production deployment or customer-data use is introduced.
+
+See [current G1/G2 ledger](../../docs/verification/CURRENT_GATE_EVIDENCE.md) for exact source/run evidence and unfinished integrations.
