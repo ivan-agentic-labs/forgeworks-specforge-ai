@@ -1,5 +1,5 @@
 from __future__ import annotations
-from specforge_ai.presentation.authentication import decode_bearer
+from specforge_ai.presentation.authentication import decode_bearer, verify_session
 
 import json
 import hashlib
@@ -78,6 +78,7 @@ def auth(authorization: Annotated[str | None, Header()] = None):
 
 def scope(required: str, store: Store):
     def dependency(claims=Depends(auth)):
+        verify_session(store, claims)
         if not claims.get("tenant_id") or not claims.get("sub") or not store.member(claims["tenant_id"], claims["sub"]):
             reject(403, "TENANT_CONTEXT_INVALID", "Verified membership is required")
         if required not in set(str(claims.get("scope", "")).split()):
@@ -142,6 +143,11 @@ def create_app(db_path: str | None = None, seed: bool = False):
     @app.exception_handler(HTTPException)
     async def errors(_, exc):
         return JSONResponse(status_code=exc.status_code, content=exc.detail if isinstance(exc.detail, dict) else {"type": "about:blank", "title": "Request rejected", "status": exc.status_code, "code": "REQUEST_REJECTED", "detail": str(exc.detail), "request_id": "runtime"})
+
+    @app.get("/readyz")
+    def ready():
+        from specforge_ai.presentation.authentication import readiness
+        return readiness(store)
 
     @app.get("/healthz")
     def health():
