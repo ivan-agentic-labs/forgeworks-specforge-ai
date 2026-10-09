@@ -139,6 +139,8 @@ class Store:
     def decide(self, tenant_id: str, ambiguity_id: str, actor: str, text: str, source_reference: str, expected_version: int) -> tuple[dict[str, Any] | None, str]:
         decision_id = str(uuid.uuid4())
         with self.lock, self.conn() as db:
+            if isinstance(db, sqlite3.Connection):
+                db.execute("BEGIN IMMEDIATE")
             ambiguity = db.execute("SELECT * FROM ambiguities WHERE tenant_id=? AND id=?", (tenant_id, ambiguity_id)).fetchone()
             if not ambiguity:
                 return None, "NOT_FOUND"
@@ -146,8 +148,10 @@ class Store:
                 return dict(ambiguity), "STALE"
             decision_version = int(ambiguity["version"])
             decision_hash = hashlib.sha256(canonical_json({"decision_text": text, "source_reference": source_reference}).encode()).hexdigest()
+            changed = db.execute("UPDATE ambiguities SET status='RESOLVED',version=version+1 WHERE tenant_id=? AND id=? AND version=?", (tenant_id, ambiguity_id, expected_version)).rowcount
+            if changed != 1:
+                return dict(ambiguity), "STALE"
             db.execute("INSERT INTO decisions(tenant_id,id,ambiguity_id,actor_id,decision_hash,source_reference,decision_text,version,created_at) VALUES(?,?,?,?,?,?,?,?,?)", (tenant_id, decision_id, ambiguity_id, actor, decision_hash, source_reference, text, decision_version, now()))
-            db.execute("UPDATE ambiguities SET status='RESOLVED',version=version+1 WHERE tenant_id=? AND id=? AND version=?", (tenant_id, ambiguity_id, expected_version))
             requirement = db.execute("SELECT set_id FROM requirements WHERE tenant_id=? AND id=?", (tenant_id, ambiguity["requirement_id"])).fetchone()
             if requirement:
                 # A decision changes the source snapshot.  Previously generated or approved
@@ -285,6 +289,8 @@ class Store:
 
     def approve(self, tenant_id: str, revision_id: str, spec_sha: str, expected_version: int, actor: str) -> tuple[sqlite3.Row | None, str]:
         with self.lock, self.conn() as db:
+            if isinstance(db, sqlite3.Connection):
+                db.execute("BEGIN IMMEDIATE")
             revision = db.execute("SELECT * FROM revisions WHERE tenant_id=? AND id=?", (tenant_id, revision_id)).fetchone()
             if not revision:
                 return None, "NOT_FOUND"
@@ -297,7 +303,7 @@ class Store:
             if revision["status"] == "STALE" or revision["source_decision_digest"] != current_snapshot or revision["source_version"] != requirement_set["source_version"]:
                 db.execute("UPDATE revisions SET status='STALE',stale_reason='SOURCE_SNAPSHOT_CHANGED',version=version+1 WHERE tenant_id=? AND id=?", (tenant_id, revision_id))
                 db.execute("UPDATE acceptance_cases SET status='INVALIDATED' WHERE tenant_id=? AND revision_id=?", (tenant_id, revision_id))
-                return self.get_revision(tenant_id, revision_id), "STALE"
+                return db.execute("SELECT * FROM revisions WHERE tenant_id=? AND id=?", (tenant_id, revision_id)).fetchone(), "STALE"
             report = json.loads(revision["validator_report_json"] or "{}")
             trace = self.trace(tenant_id, revision_id)
             if not report.get("valid"):
@@ -306,9 +312,11 @@ class Store:
                 return revision, "TRACEABILITY_INCOMPLETE"
             if revision["status"] == "APPROVED":
                 return revision, "ALREADY"
-            db.execute("UPDATE revisions SET status='APPROVED',approved_at=?,approver_id=? WHERE tenant_id=? AND id=? AND version=?", (now(), actor, tenant_id, revision_id, expected_version))
+            changed = db.execute("UPDATE revisions SET status='APPROVED',approved_at=?,approver_id=?,version=version+1 WHERE tenant_id=? AND id=? AND version=? AND status='GENERATED'", (now(), actor, tenant_id, revision_id, expected_version)).rowcount
+            if changed != 1:
+                return revision, "STALE"
             db.execute("UPDATE acceptance_cases SET status='ACCEPTED' WHERE tenant_id=? AND revision_id=?", (tenant_id, revision_id))
-            return self.get_revision(tenant_id, revision_id), "OK"
+            return db.execute("SELECT * FROM revisions WHERE tenant_id=? AND id=?", (tenant_id, revision_id)).fetchone(), "OK"
 
     def job(self, tenant_id: str, job_id: str) -> sqlite3.Row | None:
         with self.conn() as db:

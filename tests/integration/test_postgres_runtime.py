@@ -72,8 +72,11 @@ def test_postgres_revision_decision_approval_and_tenant_boundaries(monkeypatch):
     assert status=='OK' and revision['status']=='GENERATED'
     assert store.job_for_revision(TENANT,revision['id'])['state']=='SUCCEEDED'
     assert store.trace(TENANT,revision['id'])['status']=='VERIFIED'
-    approved,status=store.approve(TENANT,revision['id'],revision['spec_sha'],1,USER)
-    assert status=='OK' and approved['status']=='APPROVED'
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        approvals=list(pool.map(lambda index:peers[index].approve(TENANT,revision['id'],revision['spec_sha'],1,USER),range(2)))
+    assert sorted(result[1] for result in approvals)==['OK','STALE']
+    approved=next(result[0] for result in approvals if result[1]=='OK')
+    assert approved['status']=='APPROVED' and approved['version']==2
     assert store.get_revision(other,revision['id']) is None
     store.idempotency_store(TENANT,'synthetic-key','c'*64,{'id':revision['id']})
     replay,status=store.idempotency_lookup(TENANT,'synthetic-key','c'*64)

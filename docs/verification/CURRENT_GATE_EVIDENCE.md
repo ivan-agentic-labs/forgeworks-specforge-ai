@@ -36,6 +36,10 @@ Deterministic source-byte ingestion, requirement/ambiguity/decision/revision/tra
 
 ## Remaining dependency and implementation register
 
+### Command fencing continuation, 2026-10-09
+
+Stakeholder decisions and approval commands now take a SQLite write transaction before reading versions; PostgreSQL uses its existing tenant transaction serialization. Decisions fence the ambiguity version before inserting evidence. Approval atomically increments revision version and accepts cases only for the winning command. Updated/stale responses read the same transaction instead of a separate connection that could return old state. Independent-adapter regression tests cover one-winner decisions and approvals; the disposable PostgreSQL proof exercises concurrent approval as well. This is not validation of generated specification quality or production acceptance.
+
 1. Configure a real IdP and provisioned internal identities; finish BFF/session/CSRF/revocation and test them. This includes unfinished code, not only credentials.
 2. Configure external private storage/scanning/retention/deletion and production source connectors; the local byte adapter proves integrity and extraction behavior only.
 3. Supply an isolated runner/network policy and product GitHub App configuration; implement and prove sandbox, webhook/revocation and approval-bound remote effects before enabling them.
