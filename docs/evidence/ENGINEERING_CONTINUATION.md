@@ -26,7 +26,7 @@ The test log and GitHub Actions run linked by the delivery report are authoritat
 - External S3-compatible storage, scanning/retention/deletion and backup/restore.
 - Remote sandbox/egress/SSRF/breakout evidence; execution remains disabled.
 - GitHub App installation/webhook/draft-PR effects and AI-provider quality/cost proof.
-- Full PostgreSQL runtime adapters for AccessFix, SpecForge, AgentTest and DataReconcile.
+- Full PostgreSQL runtime adapters for AccessFix, AgentTest and DataReconcile. SpecForge now has an adapter requiring its own dedicated CI proof; production load/recovery remains open.
 - Real source extraction/scanning/agent execution beyond the synthetic fixture scope.
 - Legal/domain/operations/accessibility/cost and independent reviewer acceptance.
 
@@ -40,3 +40,7 @@ Application test result: 24 passed.
 
 - [G1 Contract Verification](https://github.com/ivan-agentic-labs/forgeworks-specforge-ai/actions/runs/37883274844): **success**.
 - [SpecForge MVP Application CI](https://github.com/ivan-agentic-labs/forgeworks-specforge-ai/actions/runs/37883274803): **success**.
+
+## PostgreSQL continuation
+
+Added a real SpecForge runtime adapter and migration 002, tenant-local transactions with nested transaction reuse, a non-owner tenant role, forced RLS, conservative advisory serialization, atomic API idempotency, and a dedicated disposable PostgreSQL workflow. See ADR 0002 and the exact new workflow result before treating the adapter as verified. Source extraction and artifacts remain fixture/quarantine scope.

@@ -107,7 +107,13 @@ def idempotency_header(value: Annotated[str | None, Header(alias="Idempotency-Ke
 
 
 def create_app(db_path: str | None = None, seed: bool = False):
-    store = Store(db_path or os.getenv("SPECFORGE_DB_PATH", str(ROOT / ".runtime/specforge.db")))
+    if os.getenv("SPECFORGE_DATABASE_URL"):
+        from specforge_ai.infrastructure.postgres_store import PostgresStore
+        store = PostgresStore(os.environ["SPECFORGE_DATABASE_URL"])
+    else:
+        if os.getenv("APP_ENV", "development") not in {"development", "test"}:
+            raise ValueError("SQLite is restricted to development/test")
+        store = Store(db_path or os.getenv("SPECFORGE_DB_PATH", str(ROOT / ".runtime/specforge.db")))
     if seed:
         store.seed()
     app = FastAPI(title="SpecForge AI MVP", version="0.2.0")
@@ -118,7 +124,9 @@ def create_app(db_path: str | None = None, seed: bool = False):
         if key is None:
             return operation()
         request_hash = hashlib.sha256(canonical_json({"action": action, "actor": claims["sub"], "payload": payload}).encode()).hexdigest()
-        with store.lock:
+        from contextlib import nullcontext
+        transaction = store.conn(claims["tenant_id"]) if os.getenv("SPECFORGE_DATABASE_URL") else nullcontext()
+        with store.lock, transaction:
             replay, status = store.idempotency_lookup(claims["tenant_id"], key, request_hash)
             if status == "CONFLICT":
                 reject(409, "IDEMPOTENCY_CONFLICT", "Idempotency-Key was already used with a different request")
