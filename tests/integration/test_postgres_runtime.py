@@ -33,6 +33,7 @@ def test_postgres_revision_decision_approval_and_tenant_boundaries(monkeypatch):
     with pytest.raises(ValueError,match='superuser'):
         PostgresStore(owner)
     store=PostgresStore(runtime)
+    assert not store.member(TENANT, "unmapped-oidc-subject")
     assert store.member(TENANT,USER)
     assert not store.member(other,USER)
     row=store.create_set(TENANT,'Synthetic orders','a'*64,USER)
