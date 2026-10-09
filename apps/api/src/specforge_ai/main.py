@@ -148,6 +148,11 @@ def create_app(db_path: str | None = None, seed: bool = False):
     async def errors(_, exc):
         return JSONResponse(status_code=exc.status_code, content=exc.detail if isinstance(exc.detail, dict) else {"type": "about:blank", "title": "Request rejected", "status": exc.status_code, "code": "REQUEST_REJECTED", "detail": str(exc.detail), "request_id": "runtime"})
 
+    @app.get("/v1/auth/config")
+    def auth_config():
+        key=os.getenv("SUPABASE_PUBLISHABLE_KEY","")
+        return {"enabled":os.getenv("AUTH_MODE")=="supabase" and key.startswith("sb_publishable_"), "supabase_url":os.getenv("SUPABASE_URL",""), "publishable_key":key if key.startswith("sb_publishable_") else "", "product":"specforge-ai", "environment":os.getenv("APP_ENV","development")}
+
     @app.get("/readyz")
     def ready():
         from specforge_ai.presentation.authentication import readiness
