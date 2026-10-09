@@ -28,6 +28,8 @@ Source: `12a3f53a043cbce47d18d3fb91d8a0fb964ebfeb`. This immutable receipt cover
 
 ## Current product scope
 
+Disposable logical restore verification now compares actual tenant RLS policy expressions/role bindings, table grants, and non-internal trigger definitions/functions, in addition to row digests, columns, constraints and RLS flags. This remains a logical disposable proof, not PITR, regional failover or production operating acceptance.
+
 Source parsing preserves original line numbers in provenance, rejects excessive requirement counts/lengths without partial writes, and rejects malformed JSON, duplicate keys and non-finite JSON constants. No silent line/count truncation is accepted. These checks do not substitute for a semantic document parser or independently adjudicated quality evaluation.
 
 Deterministic source-byte ingestion, requirement/ambiguity/decision/revision/traceability/approval workflow. Local storage is development/test-only; no LLM or external source connector is enabled.
