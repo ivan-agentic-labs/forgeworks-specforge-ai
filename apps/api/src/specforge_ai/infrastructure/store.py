@@ -91,13 +91,21 @@ class Store:
         with self.conn() as db:
             return db.execute("SELECT 1 FROM memberships WHERE tenant_id=? AND user_id=? AND status='ACTIVE'", (tenant_id, user_id)).fetchone() is not None
 
-    def create_set(self, tenant_id: str, title: str, digest: str, owner: str) -> sqlite3.Row:
-        set_id, requirement_id, ambiguity_id = (str(uuid.uuid4()) for _ in range(3))
-        provenance = hashlib.sha256((title + "|source").encode()).hexdigest()
+    def create_set(self, tenant_id: str, title: str, digest: str, owner: str, source_text: str | None = None) -> sqlite3.Row:
+        set_id = str(uuid.uuid4())
+        statements = [line.strip().lstrip("-* ").strip() for line in (source_text or f"Implement {title}\nTBD: What is the success response shape?").splitlines() if line.strip()]
+        statements = [line[:2000] for line in statements[:100] if line]
+        if not statements:
+            raise ValueError("SOURCE_HAS_NO_REQUIREMENTS")
         with self.lock, self.conn() as db:
             db.execute("INSERT INTO sets_ VALUES(?,?,?,?,?,?,?,?)", (tenant_id, set_id, title, 1, digest, owner, "OPEN", 1))
-            db.execute("INSERT INTO requirements VALUES(?,?,?,?,?,?,?)", (tenant_id, requirement_id, set_id, f"Implement {title}", "source:1-1", "functional", provenance))
-            db.execute("INSERT INTO ambiguities(tenant_id,id,requirement_id,severity,question,status,version) VALUES(?,?,?,?,?,?,?)", (tenant_id, ambiguity_id, requirement_id, "HIGH", "What is the success response shape?", "OPEN", 1))
+            for line_number, statement in enumerate(statements, 1):
+                requirement_id = str(uuid.uuid4())
+                provenance = hashlib.sha256(f"{digest}:{line_number}:{statement}".encode()).hexdigest()
+                db.execute("INSERT INTO requirements VALUES(?,?,?,?,?,?,?)", (tenant_id, requirement_id, set_id, statement, f"source:{line_number}-{line_number}", "functional", provenance))
+                if "?" in statement or "tbd" in statement.lower() or "unknown" in statement.lower():
+                    ambiguity_id = str(uuid.uuid4())
+                    db.execute("INSERT INTO ambiguities(tenant_id,id,requirement_id,severity,question,status,version) VALUES(?,?,?,?,?,?,?)", (tenant_id, ambiguity_id, requirement_id, "HIGH", statement, "OPEN", 1))
         return self.get_set(tenant_id, set_id)
 
     def get_set(self, tenant_id: str, set_id: str) -> sqlite3.Row | None:
@@ -354,6 +362,11 @@ class Store:
                 db.execute("UPDATE artifacts SET status='QUARANTINED',object_generation=? WHERE tenant_id=? AND id=?", (generation, tenant_id, artifact_id))
         return self.artifact(tenant_id, artifact_id), result_status
 
+    def make_artifact_available(self, tenant_id: str, artifact_id: str, generation: str) -> sqlite3.Row | None:
+        with self.lock, self.conn() as db:
+            db.execute("UPDATE artifacts SET status='AVAILABLE' WHERE tenant_id=? AND id=? AND status='QUARANTINED' AND object_generation=?", (tenant_id, artifact_id, generation))
+        return self.artifact(tenant_id, artifact_id)
+
     def download_intent(self, tenant_id: str, artifact_id: str) -> tuple[sqlite3.Row | None, str]:
         artifact = self.artifact(tenant_id, artifact_id)
         if not artifact:
@@ -361,3 +374,4 @@ class Store:
         if artifact["status"] != "AVAILABLE":
             return artifact, "NOT_AVAILABLE"
         return artifact, "OK"
+

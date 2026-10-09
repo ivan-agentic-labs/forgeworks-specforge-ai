@@ -9,7 +9,7 @@ The owner authorizes engineering directly on main. Owner design approval is perm
 | Implemented PostgreSQL MVP runtime | VERIFIED, disposable | Migrations 001/002, non-owner runtime role, forced tenant RLS, negative access and product-specific concurrent commands. Design-candidate schema/FK addendum is not applied or accepted by these tests. |
 | Logical restore | VERIFIED, disposable | Fresh database dump/restore, table digests, columns, constraints, RLS flags and restored non-owner membership/context behavior. Not PITR, regional failover or production RTO/RPO. |
 | JWT/OIDC | PARTIAL | Fixed algorithms, mandatory claims/UUID tenant, expiry/issuer/audience checks, offline key rotation and explicit configuration. Real IdP sessions, provisioning, BFF, CSRF and revocation remain open. |
-| Storage/real source bytes | PARTIAL | APIShield local bytes and DataReconcile/AgentTest persisted report/export downloads have integrity evidence. External storage scanning, retention/deletion and source/dataset ingestion remain open. |
+| Storage/real source bytes | PARTIAL | SpecForge now requires an available digest-verified UTF-8 source artifact and derives requirements/provenance from its stored bytes through bounded local capabilities. External storage scanning, retention/deletion and production source adapters remain open. |
 | Remote sandbox/provider/GitHub App | BLOCKED | Remote execution/effects fail closed. No independent escape/egress/SSRF proof, installed product GitHub App or real provider quality/cost proof. |
 | Domain/privacy/operations/acceptance | OPEN | Human-adjudicated corpus/thresholds, legal/domain/accessibility review, independent signoff and production operating evidence are not supplied. |
 | G1-E overall | OPEN/BLOCKED | Individual test success is not whole-gate acceptance. |
@@ -28,12 +28,12 @@ Source: `12a3f53a043cbce47d18d3fb91d8a0fb964ebfeb`. This immutable receipt cover
 
 ## Current product scope
 
-Deterministic requirement/ambiguity/decision/revision/traceability/approval workflow. source_artifact_id is not real source extraction; external artifact bytes remain quarantined.
+Deterministic source-byte ingestion, requirement/ambiguity/decision/revision/traceability/approval workflow. Local storage is development/test-only; no LLM or external source connector is enabled.
 
 ## Remaining dependency and implementation register
 
 1. Configure a real IdP and provisioned internal identities; finish BFF/session/CSRF/revocation and test them. This includes unfinished code, not only credentials.
-2. Configure external private storage/scanning/retention/deletion and implement remaining source/dataset/upload adapters; do not treat placeholder metadata or quarantined objects as verified bytes.
+2. Configure external private storage/scanning/retention/deletion and production source connectors; the local byte adapter proves integrity and extraction behavior only.
 3. Supply an isolated runner/network policy and product GitHub App configuration; implement and prove sandbox, webhook/revocation and approval-bound remote effects before enabling them.
 4. Supply approved evaluation corpora/thresholds and provider budget; implement real source/scanner/agent paths and establish observed quality/cost/load/recovery results.
 5. Obtain domain/legal/privacy/operations/independent acceptance. Production remains outside this authorized execution scope.

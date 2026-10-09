@@ -10,12 +10,13 @@ from typing import Annotated
 from uuid import UUID
 
 import jwt
-from fastapi import Depends, FastAPI, Header, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
+from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
 from specforge_ai.infrastructure.store import Store
+from specforge_ai.infrastructure.local_artifacts import LocalArtifacts, MAX_BYTES
 from specforge_ai.domain.openapi_semantics import canonical_json
 
 ROOT = Path(__file__).resolve().parents[4]
@@ -114,6 +115,8 @@ def create_app(db_path: str | None = None, seed: bool = False):
         if os.getenv("APP_ENV", "development") not in {"development", "test"}:
             raise ValueError("SQLite is restricted to development/test")
         store = Store(db_path or os.getenv("SPECFORGE_DB_PATH", str(ROOT / ".runtime/specforge.db")))
+    local_db_path = db_path or os.getenv("SPECFORGE_DB_PATH", str(ROOT / ".runtime/specforge.db"))
+    artifacts = LocalArtifacts(Path(os.getenv("SPECFORGE_ARTIFACT_ROOT", str(Path(local_db_path).parent / "artifacts"))))
     if seed:
         store.seed()
     app = FastAPI(title="SpecForge AI MVP", version="0.2.0")
@@ -146,7 +149,14 @@ def create_app(db_path: str | None = None, seed: bool = False):
 
     @app.post("/v1/requirement-sets", status_code=201)
     def create(body: NewSet, claims=Depends(scope("requirements:create", store))):
-        row = store.create_set(claims["tenant_id"], body.title, body.source_sha256, claims["sub"])
+        artifact = store.artifact(claims["tenant_id"], str(body.source_artifact_id))
+        if not artifact or artifact["status"] != "AVAILABLE":
+            reject(409, "SOURCE_ARTIFACT_NOT_AVAILABLE", "A committed source artifact is required")
+        if artifact["sha256"] != body.source_sha256:
+            reject(409, "SOURCE_DIGEST_MISMATCH", "Source digest does not match the committed artifact")
+        source = artifacts.verify(claims["tenant_id"], artifact["id"], artifact["object_generation"], artifact["sha256"], artifact["size_bytes"])
+        source_text = artifacts.validate_source(source, artifact["declared_media_type"])
+        row = store.create_set(claims["tenant_id"], body.title, body.source_sha256, claims["sub"], source_text)
         return {"id": row["id"], "status": row["status"], "created_at": iso_now(), "title": row["title"], "source_version": row["source_version"], "source_digest": row["source_digest"], "owner_id": row["owner_id"]}
 
     @app.get("/v1/requirement-sets/{sid}/requirements")
@@ -216,17 +226,26 @@ def create_app(db_path: str | None = None, seed: bool = False):
         return idempotent(claims, f"approve:{rid}", idempotency_key, body.model_dump(), operation)
 
     @app.post("/v1/artifacts/upload-intents", status_code=201)
-    def upload_intent(body: CreateUploadIntent, claims=Depends(scope("artifact:write", store))):
+    def upload_intent(body: CreateUploadIntent, claims=Depends(scope("artifact:create", store))):
+        if body.kind != "source" or body.size_bytes > MAX_BYTES:
+            reject(422 if body.kind != "source" else 413, "ARTIFACT_KIND_UNSUPPORTED" if body.kind != "source" else "ARTIFACT_TOO_LARGE", "Only source artifacts up to 1 MiB are accepted")
         row = store.create_artifact_intent(claims["tenant_id"], body.kind, body.filename, body.size_bytes, body.sha256, body.declared_media_type)
-        return {"artifact_id": row["id"], "status": "INTENT_ISSUED", "upload_url": f"https://object-store.invalid/upload/{row['id']}", "expires_at": row["expires_at"], "required_headers": {"Content-Type": body.declared_media_type or "application/octet-stream", "X-Artifact-SHA256": body.sha256}}
+        url, expires = artifacts.intent(claims["tenant_id"], row["id"], "upload")
+        return {"artifact_id": row["id"], "status": "INTENT_ISSUED", "upload_url": url, "expires_at": datetime.fromtimestamp(expires, timezone.utc).isoformat().replace("+00:00", "Z"), "required_headers": {"Content-Type": body.declared_media_type or "application/octet-stream", "X-Artifact-SHA256": body.sha256}}
 
     @app.post("/v1/artifacts/{artifact_id}/commit", status_code=201)
-    def commit_artifact(artifact_id: UUID, body: CommitUpload, claims=Depends(scope("artifact:write", store))):
+    def commit_artifact(artifact_id: UUID, body: CommitUpload, claims=Depends(scope("artifact:commit", store))):
+        pending = store.artifact(claims["tenant_id"], str(artifact_id))
+        if pending and pending["sha256"] == body.sha256 and pending["size_bytes"] == body.size_bytes:
+            source = artifacts.verify(claims["tenant_id"], str(artifact_id), body.object_generation, body.sha256, body.size_bytes)
+            artifacts.validate_source(source, pending["declared_media_type"])
         row, status = store.commit_artifact(claims["tenant_id"], str(artifact_id), body.sha256, body.size_bytes, body.object_generation)
         if status == "NOT_FOUND":
             reject(404, "RESOURCE_NOT_FOUND", "Artifact is not visible")
         if status == "DIGEST_MISMATCH":
             reject(409, "DIGEST_MISMATCH", "Committed artifact metadata does not match the intent")
+        if status in {"OK", "ALREADY"}:
+            row = store.make_artifact_available(claims["tenant_id"], str(artifact_id), body.object_generation)
         return artifact_response(row)
 
     @app.get("/v1/artifacts/{artifact_id}")
@@ -243,7 +262,32 @@ def create_app(db_path: str | None = None, seed: bool = False):
             reject(404, "RESOURCE_NOT_FOUND", "Artifact is not visible")
         if status == "NOT_AVAILABLE":
             reject(409, "ARTIFACT_NOT_AVAILABLE", "Artifact remains quarantined until validation")
-        return {"artifact_id": row["id"], "download_url": f"https://object-store.invalid/download/{row['id']}", "expires_at": (datetime.now(timezone.utc).replace(microsecond=0)).isoformat().replace("+00:00", "Z"), "object_generation": row["object_generation"]}
+        artifacts.verify(claims["tenant_id"], row["id"], row["object_generation"], row["sha256"], row["size_bytes"])
+        url, expires = artifacts.intent(claims["tenant_id"], row["id"], "download", row["object_generation"])
+        return {"artifact_id": row["id"], "download_url": url, "expires_at": datetime.fromtimestamp(expires, timezone.utc).isoformat().replace("+00:00", "Z"), "object_generation": row["object_generation"]}
+
+    @app.put("/v1/artifact-transfers/{artifact_id}", status_code=201)
+    async def upload_bytes(artifact_id: UUID, request: Request, token: str = Query(max_length=4096)):
+        claims = artifacts.capability(token, str(artifact_id), "upload")
+        row = store.artifact(claims["tenant_id"], str(artifact_id))
+        if not row or row["status"] != "INTENT_ISSUED":
+            reject(409, "ARTIFACT_NOT_PENDING", "Artifact is not pending upload")
+        content = bytearray()
+        async for chunk in request.stream():
+            content.extend(chunk)
+            if len(content) > min(MAX_BYTES, row["size_bytes"]):
+                reject(413, "ARTIFACT_TOO_LARGE", "Uploaded body exceeds declared size")
+        metadata = artifacts.put(claims["tenant_id"], str(artifact_id), bytes(content), row["sha256"], row["size_bytes"])
+        return {"artifact_id": str(artifact_id), "object_generation": metadata["generation"], "sha256": metadata["sha256"], "size_bytes": metadata["size"]}
+
+    @app.get("/v1/artifact-transfers/{artifact_id}")
+    def download_bytes(artifact_id: UUID, token: str = Query(max_length=4096)):
+        claims = artifacts.capability(token, str(artifact_id), "download")
+        row = store.artifact(claims["tenant_id"], str(artifact_id))
+        if not row or row["status"] != "AVAILABLE":
+            reject(409, "ARTIFACT_NOT_AVAILABLE", "Artifact is not available")
+        body = artifacts.verify(claims["tenant_id"], str(artifact_id), claims["generation"], row["sha256"], row["size_bytes"])
+        return Response(body, media_type=row["declared_media_type"] or "application/octet-stream", headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
 
     @app.get("/v1/jobs/{jid}")
     def job(jid: UUID, claims=Depends(scope("job:read", store))):

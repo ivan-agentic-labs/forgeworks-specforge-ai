@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 from datetime import datetime, timedelta, timezone
 
 import jwt
@@ -46,13 +47,20 @@ def test_static_console_and_api_complete_approved_flow_with_typed_gates(tmp_path
         assert "STALE_VERSION" in script.text
         assert "provider-free" in script.text
 
+        source = b"Create the orders endpoint\nTBD: What response shape is required?"
+        source_sha = hashlib.sha256(source).hexdigest()
+        intent = client.post("/v1/artifacts/upload-intents", headers=headers("artifact:create"), json={"kind": "source", "filename": "requirements.txt", "size_bytes": len(source), "sha256": source_sha, "declared_media_type": "text/plain"})
+        uploaded = client.put(intent.json()["upload_url"], content=source)
+        committed = client.post(f"/v1/artifacts/{intent.json()['artifact_id']}/commit", headers=headers("artifact:commit"), json={"sha256": source_sha, "size_bytes": len(source), "object_generation": uploaded.json()["object_generation"]})
+        assert intent.status_code == uploaded.status_code == committed.status_code == 201
+
         created = client.post(
             "/v1/requirement-sets",
             headers=headers("requirements:create", "set-create-00000001"),
             json={
                 "title": "Orders API",
-                "source_artifact_id": "33333333-3333-3333-3333-333333333333",
-                "source_sha256": "a" * 64,
+                "source_artifact_id": intent.json()["artifact_id"],
+                "source_sha256": source_sha,
             },
         )
         assert created.status_code == 201
@@ -60,7 +68,7 @@ def test_static_console_and_api_complete_approved_flow_with_typed_gates(tmp_path
         requirements = client.get(f"/v1/requirement-sets/{set_id}/requirements", headers=headers("requirements:read"))
         ambiguities = client.get(f"/v1/requirement-sets/{set_id}/ambiguities", headers=headers("requirements:read"))
         assert requirements.status_code == ambiguities.status_code == 200
-        assert len(requirements.json()["items"]) == 1
+        assert len(requirements.json()["items"]) == 2
         ambiguity = ambiguities.json()["items"][0]
 
         blocked = client.post(
@@ -116,8 +124,8 @@ def test_static_console_and_api_complete_approved_flow_with_typed_gates(tmp_path
         trace = client.get(f"/v1/spec-revisions/{payload['id']}/traceability", headers=headers("spec:read"))
         assert trace.status_code == 200
         assert trace.json()["status"] == "VERIFIED"
-        assert trace.json()["linked_requirements"] == trace.json()["total_requirements"] == 1
-        assert trace.json()["linked_acceptance_cases"] == trace.json()["total_acceptance_cases"] == 1
+        assert trace.json()["linked_requirements"] == trace.json()["total_requirements"] == 2
+        assert trace.json()["linked_acceptance_cases"] == trace.json()["total_acceptance_cases"] == 2
 
         approval_body = {"spec_sha256": payload["spec_sha256"], "expected_version": 1}
         approval = client.post(
@@ -151,3 +159,4 @@ def test_static_console_and_api_complete_approved_flow_with_typed_gates(tmp_path
         )
         assert stale_approval.status_code == 409
         assert stale_approval.json()["code"] == "STALE_VERSION"
+

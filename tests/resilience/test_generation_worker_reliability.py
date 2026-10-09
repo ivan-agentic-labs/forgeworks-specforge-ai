@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import hashlib
 
 import jwt
 from fastapi.testclient import TestClient
@@ -33,13 +34,19 @@ def headers(scope: str, key: str | None = None) -> dict[str, str]:
 
 
 def create_set_and_decision(client: TestClient) -> tuple[str, str]:
+    source = b"Create a reliable endpoint\nTBD: What is the success response shape?"
+    digest = hashlib.sha256(source).hexdigest()
+    intent = client.post("/v1/artifacts/upload-intents", headers=headers("artifact:create"), json={"kind": "source", "filename": "requirements.md", "size_bytes": len(source), "sha256": digest, "declared_media_type": "text/markdown"})
+    uploaded = client.put(intent.json()["upload_url"], content=source)
+    committed = client.post(f"/v1/artifacts/{intent.json()['artifact_id']}/commit", headers=headers("artifact:commit"), json={"sha256": digest, "size_bytes": len(source), "object_generation": uploaded.json()["object_generation"]})
+    assert intent.status_code == uploaded.status_code == committed.status_code == 201
     created = client.post(
         "/v1/requirement-sets",
         headers=headers("requirements:create", "resilience-set-0001"),
         json={
             "title": "Reliability API",
-            "source_artifact_id": "33333333-3333-3333-3333-333333333333",
-            "source_sha256": "a" * 64,
+            "source_artifact_id": intent.json()["artifact_id"],
+            "source_sha256": digest,
         },
     )
     sid = created.json()["id"]
@@ -145,26 +152,27 @@ def test_decision_change_marks_revision_stale_and_invalidates_acceptance_cases(t
         assert cases and {row["status"] for row in cases} == {"INVALIDATED"}
 
 
-def test_artifact_commit_remains_quarantined_and_download_fails_closed(tmp_path):
+def test_artifact_commit_without_uploaded_bytes_fails_closed(tmp_path):
     app = create_app(str(tmp_path / "artifact.sqlite"), seed=True)
     with TestClient(app) as client:
         intent = client.post(
             "/v1/artifacts/upload-intents",
-            headers=headers("artifact:write", "artifact-intent-0001"),
+            headers=headers("artifact:create", "artifact-intent-0001"),
             json={"kind": "source", "filename": "requirements.md", "size_bytes": 8, "sha256": "b" * 64},
         )
         assert intent.status_code == 201
         artifact_id = intent.json()["artifact_id"]
         committed = client.post(
             f"/v1/artifacts/{artifact_id}/commit",
-            headers=headers("artifact:write", "artifact-commit-0001"),
+            headers=headers("artifact:commit", "artifact-commit-0001"),
             json={"sha256": "b" * 64, "size_bytes": 8, "object_generation": "generation-1"},
         )
-        assert committed.status_code == 201
-        assert committed.json()["status"] == "QUARANTINED"
+        assert committed.status_code == 409
+        assert committed.json()["code"] == "ARTIFACT_GENERATION_MISMATCH"
         download = client.post(f"/v1/artifacts/{artifact_id}/download-intents", headers=headers("artifact:download"))
         assert download.status_code == 409
         assert download.json()["code"] == "ARTIFACT_NOT_AVAILABLE"
         with app.state.store.conn() as db:
             row = db.execute("SELECT status,object_generation,sha256 FROM artifacts WHERE id=?", (artifact_id,)).fetchone()
-        assert tuple(row) == ("QUARANTINED", "generation-1", "b" * 64)
+        assert tuple(row) == ("INTENT_ISSUED", None, "b" * 64)
+

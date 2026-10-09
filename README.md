@@ -46,3 +46,5 @@ See [current changes and residual gaps](docs/evidence/ENGINEERING_CONTINUATION.m
 ## Current main engineering status
 
 See [current G1/G2 evidence](docs/verification/CURRENT_GATE_EVIDENCE.md), [exact source receipt](docs/evidence/MAIN_VERIFICATION_2026-10-09.json), and [owner main authorization](docs/governance/ENGINEERING_MAIN_AUTHORIZATION_2026-10-09.md). PostgreSQL adapters exist for all five independent projects. Historical evidence retains its source SHA and narrower scope.
+
+The requirement flow now consumes actual integrity-checked UTF-8 source bytes. Local development/test upload and download capabilities are short-lived, tenant-bound, generation-bound and limited to 1 MiB; requirement statements and provenance digests are derived from those bytes. External object storage, malware scanning and retention/deletion evidence remain open.
