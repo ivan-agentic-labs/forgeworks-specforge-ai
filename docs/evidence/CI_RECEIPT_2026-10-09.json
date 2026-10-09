@@ -1,0 +1,20 @@
+{
+  "scope": "exact source commit; no G1-E certification",
+  "application_tests": "24 passed",
+  "slug": "specforge-ai",
+  "sha": "6c946476a7c9039f85428ded89e6d935f1837d94",
+  "runs": [
+    {
+      "id": 37883274844,
+      "name": "G1 Contract Verification",
+      "conclusion": "success",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-specforge-ai/actions/runs/37883274844"
+    },
+    {
+      "id": 37883274803,
+      "name": "SpecForge MVP Application CI",
+      "conclusion": "success",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-specforge-ai/actions/runs/37883274803"
+    }
+  ]
+}
