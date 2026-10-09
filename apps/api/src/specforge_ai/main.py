@@ -117,7 +117,11 @@ def create_app(db_path: str | None = None, seed: bool = False):
             raise ValueError("SQLite is restricted to development/test")
         store = Store(db_path or os.getenv("SPECFORGE_DB_PATH", str(ROOT / ".runtime/specforge.db")))
     local_db_path = db_path or os.getenv("SPECFORGE_DB_PATH", str(ROOT / ".runtime/specforge.db"))
-    artifacts = LocalArtifacts(Path(os.getenv("SPECFORGE_ARTIFACT_ROOT", str(Path(local_db_path).parent / "artifacts"))))
+    if os.getenv("S3_ENDPOINT"):
+        from specforge_ai.infrastructure.s3_artifacts import S3Artifacts
+        artifacts = S3Artifacts()
+    else:
+        artifacts = LocalArtifacts(Path(os.getenv("SPECFORGE_ARTIFACT_ROOT", str(Path(local_db_path).parent / "artifacts"))))
     if seed:
         store.seed()
     app = FastAPI(title="SpecForge AI MVP", version="0.2.0")
