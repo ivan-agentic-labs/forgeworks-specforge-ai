@@ -999,6 +999,65 @@ paths:
         in: path
         required: true
         schema: *id001
+  /v1/spec-revisions/{id}/download:
+    get:
+      operationId: downloadApprovedSpecification
+      summary: Download an approved current OpenAPI revision with verified integrity
+      security:
+      - BearerAuth: []
+      tags:
+      - SpecForge AI
+      x-required-scope: spec:read
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Approved OpenAPI JSON bytes; SHA-256 binds the stored revision
+          headers:
+            X-Content-SHA256:
+              schema:
+                type: string
+                pattern: '^[0-9a-f]{64}$'
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '401':
+          description: Unauthenticated
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: Revision not visible
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: Revision not approved or integrity mismatch
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: Dependency unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
 components:
   securitySchemes:
     BearerAuth:

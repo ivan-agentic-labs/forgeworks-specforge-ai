@@ -245,6 +245,18 @@ def create_app(db_path: str | None = None, seed: bool = False):
             return {"id": str(rid), "status": "APPROVED", "created_at": revision["created_at"], "revision_id": str(rid), "spec_sha256": revision["spec_sha"], "approver_id": claims["sub"], "approved_at": approved_at}
         return idempotent(claims, f"approve:{rid}", idempotency_key, body.model_dump(), operation)
 
+    @app.get("/v1/spec-revisions/{rid}/download")
+    def download_spec(rid: UUID, claims=Depends(scope("spec:read", store))):
+        revision = store.get_revision(claims["tenant_id"], str(rid))
+        if not revision:
+            reject(404, "RESOURCE_NOT_FOUND", "Revision is not visible")
+        if revision["status"] != "APPROVED":
+            reject(409, "SPEC_NOT_APPROVED", "Only an approved current revision can be downloaded")
+        body = revision["spec_json"].encode("utf-8")
+        if hashlib.sha256(body).hexdigest() != revision["spec_sha"]:
+            reject(409, "DIGEST_MISMATCH", "Stored specification failed integrity verification")
+        return Response(body, media_type="application/json", headers={"Cache-Control":"no-store", "X-Content-Type-Options":"nosniff", "X-Content-SHA256":revision["spec_sha"], "Content-Disposition":f'attachment; filename="openapi-{rid}.json"'})
+
     @app.post("/v1/artifacts/upload-intents", status_code=201)
     def upload_intent(body: CreateUploadIntent, claims=Depends(scope("artifact:create", store))):
         if body.kind != "source" or body.size_bytes > MAX_BYTES:

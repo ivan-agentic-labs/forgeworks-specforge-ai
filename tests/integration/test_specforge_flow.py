@@ -25,6 +25,12 @@ def test_requirement_to_approved_spec(tmp_path):
   tr=c.get(f'/v1/spec-revisions/{rid}/traceability',headers=h('spec:read')).json();assert tr['status']=='VERIFIED' and tr['linked_requirements']==2
   with app.state.store.conn() as db: sha=db.execute('SELECT spec_sha FROM revisions WHERE id=?',(rid,)).fetchone()['spec_sha']
   a=c.post(f'/v1/spec-revisions/{rid}/approve',headers=h('spec:approve'),json={'spec_sha256':sha,'expected_version':1});assert a.status_code==201
+  downloaded=c.get(f'/v1/spec-revisions/{rid}/download',headers=h('spec:read'));assert downloaded.status_code==200
+  assert hashlib.sha256(downloaded.content).hexdigest()==sha
+  assert downloaded.headers['x-content-sha256']==sha
+  assert c.get(f'/v1/spec-revisions/{rid}/download',headers=h('requirements:read')).status_code==403
+  d=c.post(f"/v1/ambiguities/{amb['id']}/decisions",headers=h('requirements:decide'),json={'decision_text':'Return HTTP 201 JSON','source_reference':'product-owner:synthetic-2','expected_version':2});assert d.status_code==201
+  assert c.get(f'/v1/spec-revisions/{rid}/download',headers=h('spec:read')).status_code==409
 
 def test_scope_and_tenant_fail_closed(tmp_path):
  app=create_app(str(tmp_path/'db.sqlite'),seed=True)
