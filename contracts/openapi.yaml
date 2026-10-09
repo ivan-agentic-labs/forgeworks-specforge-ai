@@ -1084,6 +1084,9 @@ components:
           type: string
         resolution_status:
           type: string
+        version:
+          type: integer
+          minimum: 1
     StakeholderDecision:
       type: object
       additionalProperties: false
@@ -1154,6 +1157,9 @@ components:
       - linked_requirements
       - unlinked_operation_ids
       - critical_open_ambiguities
+      - total_acceptance_cases
+      - linked_acceptance_cases
+      - unlinked_acceptance_case_ids
       properties:
         id:
           type: string
@@ -1176,6 +1182,17 @@ components:
             type: string
         critical_open_ambiguities:
           type: integer
+        total_acceptance_cases:
+          type: integer
+          minimum: 0
+        linked_acceptance_cases:
+          type: integer
+          minimum: 0
+        unlinked_acceptance_case_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
     ApprovedSpec:
       type: object
       additionalProperties: false
@@ -1482,4 +1499,12 @@ components:
           type:
           - string
           - 'null'
+        max_attempts:
+          type: integer
+          minimum: 1
+        next_attempt_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
 x-design-status: REVIEW_REQUIRED_NOT_IMPLEMENTED

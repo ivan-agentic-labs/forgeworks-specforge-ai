@@ -1,10 +1,29 @@
 -- SpecForge MVP disposable migration; review-only FK addendum is excluded.
+-- Candidate only: platform tables, rollback, PostgreSQL evidence, and a
+-- production object-store/scanner adapter are not claimed by this file.
 CREATE TABLE IF NOT EXISTS tenants(id uuid PRIMARY KEY,slug text UNIQUE NOT NULL,status text NOT NULL);
 CREATE TABLE IF NOT EXISTS requirement_sets(tenant_id uuid NOT NULL,id uuid NOT NULL,title text NOT NULL,source_version integer NOT NULL,source_digest char(64) NOT NULL,owner_id text NOT NULL,status text NOT NULL,PRIMARY KEY(tenant_id,id),FOREIGN KEY(tenant_id) REFERENCES tenants(id));
 CREATE TABLE IF NOT EXISTS requirements(tenant_id uuid NOT NULL,id uuid NOT NULL,set_id uuid NOT NULL,statement text NOT NULL,provenance_digest char(64) NOT NULL,PRIMARY KEY(tenant_id,id),FOREIGN KEY(tenant_id,set_id) REFERENCES requirement_sets(tenant_id,id));
 CREATE TABLE IF NOT EXISTS ambiguities(tenant_id uuid NOT NULL,id uuid NOT NULL,requirement_id uuid NOT NULL,severity text NOT NULL,question text NOT NULL,status text NOT NULL,PRIMARY KEY(tenant_id,id),FOREIGN KEY(tenant_id,requirement_id) REFERENCES requirements(tenant_id,id));
 CREATE TABLE IF NOT EXISTS spec_revisions(tenant_id uuid NOT NULL,id uuid NOT NULL,set_id uuid NOT NULL,source_version integer NOT NULL,status text NOT NULL,spec_json jsonb NOT NULL,spec_sha char(64) NOT NULL,version integer NOT NULL DEFAULT 1,PRIMARY KEY(tenant_id,id),FOREIGN KEY(tenant_id,set_id) REFERENCES requirement_sets(tenant_id,id));
+CREATE TABLE IF NOT EXISTS stakeholder_decisions(tenant_id uuid NOT NULL,id uuid NOT NULL,ambiguity_id uuid NOT NULL,actor_id uuid NOT NULL,decision_hash char(64) NOT NULL,source_reference text NOT NULL,decision_text text NOT NULL,version integer NOT NULL,created_at timestamptz NOT NULL DEFAULT now(),PRIMARY KEY(tenant_id,id),UNIQUE(tenant_id,ambiguity_id,version),FOREIGN KEY(tenant_id,ambiguity_id) REFERENCES ambiguities(tenant_id,id));
+CREATE TABLE IF NOT EXISTS acceptance_cases(tenant_id uuid NOT NULL,id uuid NOT NULL,revision_id uuid NOT NULL,requirement_id uuid NOT NULL,case_key text NOT NULL,description text NOT NULL,status text NOT NULL,PRIMARY KEY(tenant_id,id),UNIQUE(tenant_id,revision_id,requirement_id),FOREIGN KEY(tenant_id,revision_id) REFERENCES spec_revisions(tenant_id,id),FOREIGN KEY(tenant_id,requirement_id) REFERENCES requirements(tenant_id,id));
+CREATE TABLE IF NOT EXISTS artifacts(tenant_id uuid NOT NULL,id uuid NOT NULL,kind text NOT NULL,filename text NOT NULL,declared_media_type text,sha256 char(64) NOT NULL,size_bytes bigint NOT NULL,status text NOT NULL,object_generation text,created_at timestamptz NOT NULL DEFAULT now(),expires_at timestamptz,rejected_reason text,PRIMARY KEY(tenant_id,id));
+CREATE TABLE IF NOT EXISTS jobs(tenant_id uuid NOT NULL,id uuid NOT NULL,revision_id uuid NOT NULL,state text NOT NULL,created_at timestamptz NOT NULL DEFAULT now(),state_version integer NOT NULL DEFAULT 1,attempt_count integer NOT NULL DEFAULT 0,max_attempts integer NOT NULL DEFAULT 3,next_attempt_at timestamptz,last_error_code text,last_error_message text,updated_at timestamptz NOT NULL DEFAULT now(),PRIMARY KEY(tenant_id,id),FOREIGN KEY(tenant_id,revision_id) REFERENCES spec_revisions(tenant_id,id));
+ALTER TABLE spec_revisions ADD COLUMN IF NOT EXISTS source_decision_digest char(64) NOT NULL DEFAULT repeat('0',64);
+ALTER TABLE spec_revisions ADD COLUMN IF NOT EXISTS validator_report_json jsonb NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE spec_revisions ADD COLUMN IF NOT EXISTS validator_report_sha char(64) NOT NULL DEFAULT repeat('0',64);
+ALTER TABLE spec_revisions ADD COLUMN IF NOT EXISTS traceability_report_json jsonb NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE spec_revisions ADD COLUMN IF NOT EXISTS traceability_report_sha char(64) NOT NULL DEFAULT repeat('0',64);
+ALTER TABLE spec_revisions ADD COLUMN IF NOT EXISTS stale_reason text;
+ALTER TABLE spec_revisions ADD COLUMN IF NOT EXISTS approved_at timestamptz;
+ALTER TABLE spec_revisions ADD COLUMN IF NOT EXISTS approver_id uuid;
 ALTER TABLE requirement_sets ENABLE ROW LEVEL SECURITY;ALTER TABLE requirements ENABLE ROW LEVEL SECURITY;ALTER TABLE spec_revisions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE stakeholder_decisions ENABLE ROW LEVEL SECURITY;ALTER TABLE acceptance_cases ENABLE ROW LEVEL SECURITY;ALTER TABLE artifacts ENABLE ROW LEVEL SECURITY;ALTER TABLE jobs ENABLE ROW LEVEL SECURITY;
 CREATE POLICY requirement_sets_tenant ON requirement_sets USING(tenant_id=nullif(current_setting('app.tenant_id',true),'')::uuid) WITH CHECK(tenant_id=nullif(current_setting('app.tenant_id',true),'')::uuid);
 CREATE POLICY requirements_tenant ON requirements USING(tenant_id=nullif(current_setting('app.tenant_id',true),'')::uuid) WITH CHECK(tenant_id=nullif(current_setting('app.tenant_id',true),'')::uuid);
 CREATE POLICY spec_revisions_tenant ON spec_revisions USING(tenant_id=nullif(current_setting('app.tenant_id',true),'')::uuid) WITH CHECK(tenant_id=nullif(current_setting('app.tenant_id',true),'')::uuid);
+CREATE POLICY stakeholder_decisions_tenant ON stakeholder_decisions USING(tenant_id=nullif(current_setting('app.tenant_id',true),'')::uuid) WITH CHECK(tenant_id=nullif(current_setting('app.tenant_id',true),'')::uuid);
+CREATE POLICY acceptance_cases_tenant ON acceptance_cases USING(tenant_id=nullif(current_setting('app.tenant_id',true),'')::uuid) WITH CHECK(tenant_id=nullif(current_setting('app.tenant_id',true),'')::uuid);
+CREATE POLICY artifacts_tenant ON artifacts USING(tenant_id=nullif(current_setting('app.tenant_id',true),'')::uuid) WITH CHECK(tenant_id=nullif(current_setting('app.tenant_id',true),'')::uuid);
+CREATE POLICY jobs_tenant ON jobs USING(tenant_id=nullif(current_setting('app.tenant_id',true),'')::uuid) WITH CHECK(tenant_id=nullif(current_setting('app.tenant_id',true),'')::uuid);
