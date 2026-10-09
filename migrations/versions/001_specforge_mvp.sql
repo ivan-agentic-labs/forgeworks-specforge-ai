@@ -1,0 +1,10 @@
+-- SpecForge MVP disposable migration; review-only FK addendum is excluded.
+CREATE TABLE IF NOT EXISTS tenants(id uuid PRIMARY KEY,slug text UNIQUE NOT NULL,status text NOT NULL);
+CREATE TABLE IF NOT EXISTS requirement_sets(tenant_id uuid NOT NULL,id uuid NOT NULL,title text NOT NULL,source_version integer NOT NULL,source_digest char(64) NOT NULL,owner_id text NOT NULL,status text NOT NULL,PRIMARY KEY(tenant_id,id),FOREIGN KEY(tenant_id) REFERENCES tenants(id));
+CREATE TABLE IF NOT EXISTS requirements(tenant_id uuid NOT NULL,id uuid NOT NULL,set_id uuid NOT NULL,statement text NOT NULL,provenance_digest char(64) NOT NULL,PRIMARY KEY(tenant_id,id),FOREIGN KEY(tenant_id,set_id) REFERENCES requirement_sets(tenant_id,id));
+CREATE TABLE IF NOT EXISTS ambiguities(tenant_id uuid NOT NULL,id uuid NOT NULL,requirement_id uuid NOT NULL,severity text NOT NULL,question text NOT NULL,status text NOT NULL,PRIMARY KEY(tenant_id,id),FOREIGN KEY(tenant_id,requirement_id) REFERENCES requirements(tenant_id,id));
+CREATE TABLE IF NOT EXISTS spec_revisions(tenant_id uuid NOT NULL,id uuid NOT NULL,set_id uuid NOT NULL,source_version integer NOT NULL,status text NOT NULL,spec_json jsonb NOT NULL,spec_sha char(64) NOT NULL,version integer NOT NULL DEFAULT 1,PRIMARY KEY(tenant_id,id),FOREIGN KEY(tenant_id,set_id) REFERENCES requirement_sets(tenant_id,id));
+ALTER TABLE requirement_sets ENABLE ROW LEVEL SECURITY;ALTER TABLE requirements ENABLE ROW LEVEL SECURITY;ALTER TABLE spec_revisions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY requirement_sets_tenant ON requirement_sets USING(tenant_id=nullif(current_setting('app.tenant_id',true),'')::uuid) WITH CHECK(tenant_id=nullif(current_setting('app.tenant_id',true),'')::uuid);
+CREATE POLICY requirements_tenant ON requirements USING(tenant_id=nullif(current_setting('app.tenant_id',true),'')::uuid) WITH CHECK(tenant_id=nullif(current_setting('app.tenant_id',true),'')::uuid);
+CREATE POLICY spec_revisions_tenant ON spec_revisions USING(tenant_id=nullif(current_setting('app.tenant_id',true),'')::uuid) WITH CHECK(tenant_id=nullif(current_setting('app.tenant_id',true),'')::uuid);
