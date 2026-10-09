@@ -10,6 +10,7 @@ from uuid import UUID
 import jwt
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
 from specforge_ai.infrastructure.store import Store
@@ -217,6 +218,12 @@ def create_app(db_path: str | None = None, seed: bool = False):
         if not row:
             reject(404, "RESOURCE_NOT_FOUND", "Job is not visible")
         return job_response(row)
+
+    # The review console is static and calls only the explicit /v1 API above.
+    # No provider or server-side rendering path is introduced by this mount.
+    web_dir = ROOT / "apps" / "web"
+    if web_dir.is_dir():
+        app.mount("/", StaticFiles(directory=web_dir, html=True), name="web")
 
     return app
 

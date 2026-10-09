@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SpecForge AI · Review Console</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="masthead">
+      <div>
+        <p class="eyebrow">SPECIFICATION REVIEW CONSOLE</p>
+        <h1>Requirements → approved API</h1>
+        <p class="lede">A thin, deterministic review surface. Ambiguity gates generation; approval is bound to the current revision digest and version.</p>
+      </div>
+      <span class="provider-badge"><span class="dot"></span> Provider calls disabled</span>
+    </header>
+
+    <section class="panel config-panel" aria-labelledby="connection-heading">
+      <div class="panel-heading"><div><p class="eyebrow">CONNECTION</p><h2 id="connection-heading">API session</h2></div><span id="connection-status" class="status-chip neutral">Not connected</span></div>
+      <div class="form-grid three">
+        <label>API base URL <input id="api-base" type="url" placeholder="http://localhost:8000" autocomplete="url"></label>
+        <label>Bearer token <input id="token" type="password" placeholder="JWT (optional in your local proxy)" autocomplete="off"></label>
+        <label>Requirement set ID <input id="set-id" type="text" placeholder="UUID" autocomplete="off"></label>
+      </div>
+      <div class="actions"><button id="load-btn" class="primary">Load review state</button><button id="reset-btn" class="secondary">Reset local session</button></div>
+      <p class="hint">The base URL is saved only in this browser. Use a same-origin API by default, or enter a configured API origin.</p>
+    </section>
+
+    <section id="gate" class="gate neutral" aria-live="polite">
+      <div class="gate-icon">●</div><div><strong>Ambiguity gate is waiting for a requirement set.</strong><p>Load requirements and open ambiguities to see whether generation can proceed.</p></div>
+    </section>
+
+    <section class="workspace">
+      <div class="panel">
+        <div class="panel-heading"><div><p class="eyebrow">SOURCE REVIEW</p><h2>Requirements</h2></div><span id="requirements-count" class="count">0</span></div>
+        <div id="requirements-list" class="list empty">Nothing loaded yet.</div>
+      </div>
+      <div class="panel">
+        <div class="panel-heading"><div><p class="eyebrow">HUMAN INPUT</p><h2>Ambiguities</h2></div><span id="ambiguities-count" class="count">0</span></div>
+        <div id="ambiguities-list" class="list empty">Nothing loaded yet.</div>
+        <form id="decision-form" class="decision-form hidden">
+          <label>Resolve selected ambiguity <select id="ambiguity-id"></select></label>
+          <label>Decision <textarea id="decision-text" rows="3" placeholder="Record the stakeholder decision"></textarea></label>
+          <label>Source reference <input id="source-reference" type="text" value="product-owner:web-console"></label>
+          <button class="primary" type="submit">Record decision</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="panel pipeline" aria-labelledby="pipeline-heading">
+      <div class="panel-heading"><div><p class="eyebrow">DETERMINISTIC PIPELINE</p><h2 id="pipeline-heading">Generate, trace, approve</h2></div><span id="revision-status" class="status-chip neutral">No revision</span></div>
+      <div class="form-grid two">
+        <label>Source version <input id="source-version" type="number" min="1" value="1"></label>
+        <label>Output profile <input id="output-profile" type="text" value="openapi31"></label>
+      </div>
+      <div class="actions"><button id="generate-btn" class="primary" disabled>Generate revision</button><button id="trace-btn" class="secondary" disabled>Refresh traceability</button></div>
+      <div id="traceability" class="trace empty">Generate a revision to inspect linked requirements and acceptance cases.</div>
+      <div class="approval-row">
+        <label class="grow">Revision ID <input id="revision-id" type="text" placeholder="UUID"></label>
+        <label>Expected version <input id="expected-version" type="number" min="1" value="1"></label>
+        <label class="grow">Spec SHA-256 <input id="spec-sha" type="text" placeholder="64-character digest"></label>
+        <button id="approve-btn" class="primary" disabled>Approve revision</button>
+      </div>
+    </section>
+
+    <section id="events" class="panel" aria-labelledby="events-heading">
+      <div class="panel-heading"><div><p class="eyebrow">AUDIT FEED</p><h2 id="events-heading">Request feedback</h2></div><button id="clear-events" class="link-button">Clear</button></div>
+      <div id="event-list" class="event-list empty">Actions and typed API errors appear here.</div>
+    </section>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>

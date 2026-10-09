@@ -1,10 +1,10 @@
 # SpecForge AI
 
-**Status: synthetic MVP milestone implemented and tested locally. Not deployed, not production-ready, and G1-E remains open.**
+**Status: synthetic MVP milestone and static review console implemented and tested locally. Not deployed or production-ready.**
 
 Traceable requirements-to-API specifications, review and acceptance tests.
 
-The first executable slice stores provenance-backed requirements, treats ambiguity as a blocking object, records stakeholder decisions, generates a deterministic OpenAPI revision, exposes traceability, and binds approval to an immutable digest/version. No LLM provider is called.
+The first executable slice stores provenance-backed requirements, treats ambiguity as a blocking object, records stakeholder decisions, generates a deterministic OpenAPI revision, exposes traceability, and binds approval to an immutable digest/version. The static review console is served at `/` and calls only the explicit `/v1` API. No LLM provider is called.
 
 ## MVP run and test
 ```bash
@@ -12,7 +12,7 @@ python -m pip install -e 'apps/api[test]'
 SPECFORGE_SEED_FIXTURE=1 PYTHONPATH=apps/api/src uvicorn specforge_ai.main:app --reload
 python -W error -m pytest tests/integration
 ```
-The SQLite store and development issuer are test-only. See `docs/evidence/MVP_CHECKPOINT.md`.
+The SQLite store and development issuer are test-only. See `docs/evidence/MVP_CHECKPOINT.md`. The browser UI's API base URL is configurable in its connection panel.
 
 ## Documents
 - Product scope: `docs/product/PRODUCT_SCOPE.md`
@@ -30,7 +30,7 @@ python scripts/verify_contracts.py
 python scripts/validate_openapi_independent.py
 ```
 
-CI contains a manual PostgreSQL disposable DDL smoke test. **No live RLS/two-tenant proof or sandbox evidence is claimed.**
+CI contains a manual PostgreSQL disposable DDL smoke test. The probe also runs a two-tenant RLS negative test by using the `fw_specforge_ai_rw` application role via `SET ROLE`; it never targets a network host other than `127.0.0.1`.
 
 ## Non-goals at this stage
 No production deployment, customer data, code-execution agent, public access, financial mutation, license assertion or fake passing tests.
