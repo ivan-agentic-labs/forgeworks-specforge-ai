@@ -1,4 +1,5 @@
 from __future__ import annotations
+from specforge_ai.presentation.authentication import decode_bearer
 
 import json
 import hashlib
@@ -71,12 +72,7 @@ def reject(status: int, code: str, detail: str) -> None:
 
 
 def auth(authorization: Annotated[str | None, Header()] = None):
-    if not authorization or not authorization.startswith("Bearer "):
-        reject(401, "UNAUTHENTICATED", "Bearer token is required")
-    try:
-        return jwt.decode(authorization[7:], os.getenv("DEV_AUTH_SECRET", "forgeworks-development-secret-32-plus"), algorithms=["HS256"], issuer=os.getenv("AUTH_ISSUER", "https://issuer.synthetic.invalid"), audience=os.getenv("AUTH_AUDIENCE", "forgeworks-api"))
-    except jwt.PyJWTError:
-        reject(401, "INVALID_TOKEN", "Token signature, issuer, audience, or expiry is invalid")
+    return decode_bearer(authorization)
 
 
 def scope(required: str, store: Store):
@@ -258,3 +254,4 @@ def create_app(db_path: str | None = None, seed: bool = False):
 
 
 app = create_app(seed=os.getenv("SPECFORGE_SEED_FIXTURE", "0") == "1")
+
