@@ -1,10 +1,18 @@
 # SpecForge AI
 
-**Status: GitHub G2 bootstrap candidate. Not implemented, not deployed, not production-ready.**
+**Status: synthetic MVP milestone implemented and tested locally. Not deployed, not production-ready, and G1-E remains open.**
 
 Traceable requirements-to-API specifications, review and acceptance tests.
 
-This private repository contains the canonical G1 design and executable **verification scaffolding**, not functioning AI product code.
+The first executable slice stores provenance-backed requirements, treats ambiguity as a blocking object, records stakeholder decisions, generates a deterministic OpenAPI revision, exposes traceability, and binds approval to an immutable digest/version. No LLM provider is called.
+
+## MVP run and test
+```bash
+python -m pip install -e 'apps/api[test]'
+SPECFORGE_SEED_FIXTURE=1 PYTHONPATH=apps/api/src uvicorn specforge_ai.main:app --reload
+python -W error -m pytest tests/integration
+```
+The SQLite store and development issuer are test-only. See `docs/evidence/MVP_CHECKPOINT.md`.
 
 ## Documents
 - Product scope: `docs/product/PRODUCT_SCOPE.md`
