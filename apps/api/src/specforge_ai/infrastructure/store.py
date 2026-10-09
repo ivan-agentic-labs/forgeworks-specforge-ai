@@ -93,13 +93,19 @@ class Store:
 
     def create_set(self, tenant_id: str, title: str, digest: str, owner: str, source_text: str | None = None) -> sqlite3.Row:
         set_id = str(uuid.uuid4())
-        statements = [line.strip().lstrip("-* ").strip() for line in (source_text or f"Implement {title}\nTBD: What is the success response shape?").splitlines() if line.strip()]
-        statements = [line[:2000] for line in statements[:100] if line]
+        statements = []
+        source = source_text if source_text is not None else f"Implement {title}\nTBD: What is the success response shape?"
+        for line_number, line in enumerate(source.splitlines(), 1):
+            statement = line.strip().lstrip("-* ").strip()
+            if statement:
+                statements.append((line_number, statement))
+        if len(statements) > 100 or any(len(statement) > 2000 for _, statement in statements):
+            raise ValueError("SOURCE_REQUIREMENT_LIMIT_EXCEEDED")
         if not statements:
             raise ValueError("SOURCE_HAS_NO_REQUIREMENTS")
         with self.lock, self.conn() as db:
             db.execute("INSERT INTO sets_ VALUES(?,?,?,?,?,?,?,?)", (tenant_id, set_id, title, 1, digest, owner, "OPEN", 1))
-            for line_number, statement in enumerate(statements, 1):
+            for line_number, statement in statements:
                 requirement_id = str(uuid.uuid4())
                 provenance = hashlib.sha256(f"{digest}:{line_number}:{statement}".encode()).hexdigest()
                 db.execute("INSERT INTO requirements VALUES(?,?,?,?,?,?,?)", (tenant_id, requirement_id, set_id, statement, f"source:{line_number}-{line_number}", "functional", provenance))

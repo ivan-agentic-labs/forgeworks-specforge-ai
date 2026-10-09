@@ -156,7 +156,12 @@ def create_app(db_path: str | None = None, seed: bool = False):
             reject(409, "SOURCE_DIGEST_MISMATCH", "Source digest does not match the committed artifact")
         source = artifacts.verify(claims["tenant_id"], artifact["id"], artifact["object_generation"], artifact["sha256"], artifact["size_bytes"])
         source_text = artifacts.validate_source(source, artifact["declared_media_type"])
-        row = store.create_set(claims["tenant_id"], body.title, body.source_sha256, claims["sub"], source_text)
+        try:
+            row = store.create_set(claims["tenant_id"], body.title, body.source_sha256, claims["sub"], source_text)
+        except ValueError as error:
+            if str(error) not in {"SOURCE_HAS_NO_REQUIREMENTS", "SOURCE_REQUIREMENT_LIMIT_EXCEEDED"}:
+                raise
+            reject(422, str(error), "Source must contain 1–100 requirements of at most 2000 characters each")
         return {"id": row["id"], "status": row["status"], "created_at": iso_now(), "title": row["title"], "source_version": row["source_version"], "source_digest": row["source_digest"], "owner_id": row["owner_id"]}
 
     @app.get("/v1/requirement-sets/{sid}/requirements")

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import sqlite3
 import tempfile
@@ -116,4 +117,18 @@ class LocalArtifacts:
             reject("ARTIFACT_VALIDATION_FAILED", "Source must be valid UTF-8", 422)
         if "\x00" in text or not text.strip():
             reject("ARTIFACT_VALIDATION_FAILED", "Source must be non-empty text without NUL bytes", 422)
+        if media_type == "application/json":
+            def unique_object(pairs):
+                result = {}
+                for key, value in pairs:
+                    if key in result:
+                        raise ValueError("Duplicate JSON key")
+                    result[key] = value
+                return result
+            def finite_constant(value):
+                raise ValueError("Non-finite JSON number")
+            try:
+                json.loads(text, object_pairs_hook=unique_object, parse_constant=finite_constant)
+            except (ValueError, RecursionError):
+                reject("ARTIFACT_VALIDATION_FAILED", "JSON source must be valid and unambiguous", 422)
         return text
