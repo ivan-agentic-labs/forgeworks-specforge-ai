@@ -82,6 +82,13 @@ def test_artifact_bytes_are_verified_and_downloadable(tmp_path):
         assert download.status_code == 201, download.text
         fetched = client.get(download.json()["download_url"])
         assert fetched.status_code == 200 and fetched.content == b"The API returns JSON"
+        # A capability issued before revocation must not remain usable.
+        with client.app.state.store.conn() as db:
+            db.execute("UPDATE memberships SET status='REVOKED' WHERE tenant_id=? AND user_id=?", (TENANT, USER))
+        revoked = client.get(download.json()["download_url"])
+        assert revoked.status_code == 403 and revoked.json()["code"] == "MEMBERSHIP_REVOKED"
+        with client.app.state.store.conn() as db:
+            db.execute("UPDATE memberships SET status='ACTIVE' WHERE tenant_id=? AND user_id=?", (TENANT, USER))
         rejected = client.post("/v1/requirement-sets", headers=headers("requirements:create"), json={"title": "Wrong digest", "source_artifact_id": artifact_id, "source_sha256": "0" * 64})
         assert rejected.status_code == 409 and rejected.json()["code"] == "SOURCE_DIGEST_MISMATCH"
 

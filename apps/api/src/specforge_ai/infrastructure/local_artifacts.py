@@ -50,14 +50,14 @@ class LocalArtifacts:
             reject("ARTIFACT_INTEGRITY_FAILURE", "Unsafe object path")
         return target
 
-    def intent(self, tenant: str, artifact_id: str, action: str, generation: str | None = None):
+    def intent(self, tenant: str, actor: str, artifact_id: str, action: str, generation: str | None = None):
         expires = int(time.time()) + TTL
-        token = jwt.encode({"iss": "specforge-artifacts", "aud": "artifact-transfer", "sub": artifact_id, "tenant_id": tenant, "action": action, "generation": generation, "jti": str(uuid4()), "exp": expires}, self.secret(), algorithm="HS256")
+        token = jwt.encode({"iss": "specforge-artifacts", "aud": "artifact-transfer", "sub": artifact_id, "tenant_id": tenant, "actor": actor, "action": action, "generation": generation, "jti": str(uuid4()), "exp": expires}, self.secret(), algorithm="HS256")
         return f"/v1/artifact-transfers/{artifact_id}?token={token}", expires
 
     def capability(self, token: str, artifact_id: str, action: str) -> dict:
         try:
-            claims = jwt.decode(token, self.secret(), algorithms=["HS256"], issuer="specforge-artifacts", audience="artifact-transfer", options={"require": ["exp", "sub", "tenant_id", "action", "jti"]})
+            claims = jwt.decode(token, self.secret(), algorithms=["HS256"], issuer="specforge-artifacts", audience="artifact-transfer", options={"require": ["exp", "sub", "tenant_id", "actor", "action", "jti"]})
             if claims["sub"] != artifact_id or claims["action"] != action:
                 raise jwt.InvalidTokenError("wrong capability binding")
             self.path(claims["tenant_id"], claims["sub"])
