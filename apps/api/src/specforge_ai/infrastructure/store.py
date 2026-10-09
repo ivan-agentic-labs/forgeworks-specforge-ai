@@ -304,6 +304,27 @@ class Store:
         with self.conn() as db:
             return db.execute("SELECT * FROM jobs WHERE tenant_id=? AND revision_id=? ORDER BY created_at DESC LIMIT 1", (tenant_id, revision_id)).fetchone()
 
+    def idempotency_lookup(self, tenant_id: str, key: str, request_hash: str) -> tuple[dict[str, Any] | None, str]:
+        """Return a committed response, or distinguish a miss from key reuse."""
+        with self.conn() as db:
+            row = db.execute(
+                "SELECT request_hash,response_json FROM idempotency_records WHERE tenant_id=? AND key=?",
+                (tenant_id, key),
+            ).fetchone()
+        if not row:
+            return None, "MISS"
+        if row["request_hash"] != request_hash:
+            return None, "CONFLICT"
+        return json.loads(row["response_json"]), "REPLAY"
+
+    def idempotency_store(self, tenant_id: str, key: str, request_hash: str, response: dict[str, Any]) -> None:
+        """Persist the exact successful response used for subsequent replays."""
+        with self.conn() as db:
+            db.execute(
+                "INSERT INTO idempotency_records(tenant_id,key,request_hash,response_json,created_at) VALUES(?,?,?,?,?)",
+                (tenant_id, key, request_hash, canonical_json(response), now()),
+            )
+
     def create_artifact_intent(self, tenant_id: str, kind: str, filename: str, size_bytes: int, sha256: str, media_type: str | None) -> sqlite3.Row:
         artifact_id = str(uuid.uuid4())
         created = now()

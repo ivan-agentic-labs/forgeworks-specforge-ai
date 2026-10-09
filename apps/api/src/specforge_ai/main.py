@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 from datetime import datetime, timezone
 from pathlib import Path
@@ -14,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
 from specforge_ai.infrastructure.store import Store
+from specforge_ai.domain.openapi_semantics import canonical_json
 
 ROOT = Path(__file__).resolve().parents[4]
 
@@ -102,12 +104,33 @@ def job_response(row) -> dict:
     }
 
 
+def idempotency_header(value: Annotated[str | None, Header(alias="Idempotency-Key")] = None) -> str | None:
+    if value is not None and not 16 <= len(value) <= 128:
+        reject(400, "INVALID_IDEMPOTENCY_KEY", "Idempotency-Key must contain 16 to 128 characters")
+    return value
+
+
 def create_app(db_path: str | None = None, seed: bool = False):
     store = Store(db_path or os.getenv("SPECFORGE_DB_PATH", str(ROOT / ".runtime/specforge.db")))
     if seed:
         store.seed()
     app = FastAPI(title="SpecForge AI MVP", version="0.2.0")
     app.state.store = store
+
+    def idempotent(claims, action: str, key: str | None, payload: dict, operation):
+        """Serialize a command and replay its successful response for duplicate delivery."""
+        if key is None:
+            return operation()
+        request_hash = hashlib.sha256(canonical_json({"action": action, "actor": claims["sub"], "payload": payload}).encode()).hexdigest()
+        with store.lock:
+            replay, status = store.idempotency_lookup(claims["tenant_id"], key, request_hash)
+            if status == "CONFLICT":
+                reject(409, "IDEMPOTENCY_CONFLICT", "Idempotency-Key was already used with a different request")
+            if status == "REPLAY":
+                return replay
+            response = operation()
+            store.idempotency_store(claims["tenant_id"], key, request_hash, response)
+            return response
 
     @app.exception_handler(HTTPException)
     async def errors(_, exc):
@@ -137,27 +160,31 @@ def create_app(db_path: str | None = None, seed: bool = False):
         return {"items": items, "next_cursor": None, "has_more": False}
 
     @app.post("/v1/ambiguities/{aid}/decisions", status_code=201)
-    def decision(aid: UUID, body: Decision, claims=Depends(scope("requirements:decide", store))):
-        result, status = store.decide(claims["tenant_id"], str(aid), claims["sub"], body.decision_text, body.source_reference, body.expected_version)
-        if status == "NOT_FOUND":
-            reject(404, "RESOURCE_NOT_FOUND", "Ambiguity is not visible")
-        if status == "STALE":
-            reject(409, "STALE_VERSION", "Ambiguity version is stale")
-        return {"id": result["id"], "status": "RECORDED", "created_at": iso_now(), "ambiguity_id": str(aid), "actor_id": claims["sub"], "decision_hash": result["decision_hash"], "source_reference": body.source_reference}
+    def decision(aid: UUID, body: Decision, claims=Depends(scope("requirements:decide", store)), idempotency_key: str | None = Depends(idempotency_header)):
+        def operation():
+            result, status = store.decide(claims["tenant_id"], str(aid), claims["sub"], body.decision_text, body.source_reference, body.expected_version)
+            if status == "NOT_FOUND":
+                reject(404, "RESOURCE_NOT_FOUND", "Ambiguity is not visible")
+            if status == "STALE":
+                reject(409, "STALE_VERSION", "Ambiguity version is stale")
+            return {"id": result["id"], "status": "RECORDED", "created_at": iso_now(), "ambiguity_id": str(aid), "actor_id": claims["sub"], "decision_hash": result["decision_hash"], "source_reference": body.source_reference}
+        return idempotent(claims, f"decision:{aid}", idempotency_key, body.model_dump(), operation)
 
     @app.post("/v1/requirement-sets/{sid}/spec-revisions", status_code=202)
-    def generate(sid: UUID, body: Generate, claims=Depends(scope("spec:generate", store))):
-        revision, status = store.revision(claims["tenant_id"], str(sid), body.source_version, body.output_profile)
-        if status == "NOT_FOUND":
-            reject(404, "RESOURCE_NOT_FOUND", "Requirement set is not visible")
-        if status == "OPEN_AMBIGUITY":
-            reject(409, "OPEN_AMBIGUITY", "Resolve all high-impact ambiguities before generation")
-        if status == "SOURCE_VERSION_STALE":
-            reject(409, "STALE_VERSION", "Requirement source version is stale")
-        job_row = store.job_for_revision(claims["tenant_id"], revision["id"])
-        if not job_row:
-            reject(503, "JOB_NOT_PERSISTED", "Durable generation job was not persisted")
-        return {"id": revision["id"], "status": revision["status"], "created_at": revision["created_at"], "requirement_set_id": str(sid), "input_version": revision["source_version"], "job_id": job_row["id"]}
+    def generate(sid: UUID, body: Generate, claims=Depends(scope("spec:generate", store)), idempotency_key: str | None = Depends(idempotency_header)):
+        def operation():
+            revision, status = store.revision(claims["tenant_id"], str(sid), body.source_version, body.output_profile)
+            if status == "NOT_FOUND":
+                reject(404, "RESOURCE_NOT_FOUND", "Requirement set is not visible")
+            if status == "OPEN_AMBIGUITY":
+                reject(409, "OPEN_AMBIGUITY", "Resolve all high-impact ambiguities before generation")
+            if status == "SOURCE_VERSION_STALE":
+                reject(409, "STALE_VERSION", "Requirement source version is stale")
+            job_row = store.job_for_revision(claims["tenant_id"], revision["id"])
+            if not job_row:
+                reject(503, "JOB_NOT_PERSISTED", "Durable generation job was not persisted")
+            return {"id": revision["id"], "status": revision["status"], "created_at": revision["created_at"], "requirement_set_id": str(sid), "input_version": revision["source_version"], "job_id": job_row["id"], "spec_sha256": revision["spec_sha"]}
+        return idempotent(claims, f"generate:{sid}", idempotency_key, body.model_dump(), operation)
 
     @app.get("/v1/spec-revisions/{rid}/traceability")
     def trace(rid: UUID, claims=Depends(scope("spec:read", store))):
@@ -167,20 +194,22 @@ def create_app(db_path: str | None = None, seed: bool = False):
         return report
 
     @app.post("/v1/spec-revisions/{rid}/approve", status_code=201)
-    def approve(rid: UUID, body: Approve, claims=Depends(scope("spec:approve", store))):
-        revision, status = store.approve(claims["tenant_id"], str(rid), body.spec_sha256, body.expected_version, claims["sub"])
-        if status == "NOT_FOUND":
-            reject(404, "RESOURCE_NOT_FOUND", "Revision is not visible")
-        if status == "STALE":
-            reject(409, "STALE_VERSION", "Revision or source snapshot is stale")
-        if status == "DIGEST_MISMATCH":
-            reject(409, "DIGEST_MISMATCH", "Spec digest does not match revision")
-        if status == "VALIDATION_FAILED":
-            reject(422, "OPENAPI_SEMANTIC_INVALID", "Generated OpenAPI failed independent semantic validation")
-        if status == "TRACEABILITY_INCOMPLETE":
-            reject(409, "TRACEABILITY_INCOMPLETE", "Every requirement and acceptance case must be linked")
-        approved_at = revision["approved_at"] or iso_now()
-        return {"id": str(rid), "status": "APPROVED", "created_at": revision["created_at"], "revision_id": str(rid), "spec_sha256": revision["spec_sha"], "approver_id": claims["sub"], "approved_at": approved_at}
+    def approve(rid: UUID, body: Approve, claims=Depends(scope("spec:approve", store)), idempotency_key: str | None = Depends(idempotency_header)):
+        def operation():
+            revision, status = store.approve(claims["tenant_id"], str(rid), body.spec_sha256, body.expected_version, claims["sub"])
+            if status == "NOT_FOUND":
+                reject(404, "RESOURCE_NOT_FOUND", "Revision is not visible")
+            if status == "STALE":
+                reject(409, "STALE_VERSION", "Revision or source snapshot is stale")
+            if status == "DIGEST_MISMATCH":
+                reject(409, "DIGEST_MISMATCH", "Spec digest does not match revision")
+            if status == "VALIDATION_FAILED":
+                reject(422, "OPENAPI_SEMANTIC_INVALID", "Generated OpenAPI failed independent semantic validation")
+            if status == "TRACEABILITY_INCOMPLETE":
+                reject(409, "TRACEABILITY_INCOMPLETE", "Every requirement and acceptance case must be linked")
+            approved_at = revision["approved_at"] or iso_now()
+            return {"id": str(rid), "status": "APPROVED", "created_at": revision["created_at"], "revision_id": str(rid), "spec_sha256": revision["spec_sha"], "approver_id": claims["sub"], "approved_at": approved_at}
+        return idempotent(claims, f"approve:{rid}", idempotency_key, body.model_dump(), operation)
 
     @app.post("/v1/artifacts/upload-intents", status_code=201)
     def upload_intent(body: CreateUploadIntent, claims=Depends(scope("artifact:write", store))):
