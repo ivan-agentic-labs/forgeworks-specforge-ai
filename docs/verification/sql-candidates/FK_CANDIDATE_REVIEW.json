@@ -1,0 +1,26 @@
+[
+  {
+    "child": "acceptance_cases",
+    "column": "spec_revision_id",
+    "parent": "spec_revisions",
+    "structural": "passed structural candidate checks"
+  },
+  {
+    "child": "acceptance_cases",
+    "column": "requirement_id",
+    "parent": "requirements",
+    "structural": "passed structural candidate checks"
+  },
+  {
+    "child": "operations",
+    "column": "spec_revision_id",
+    "parent": "spec_revisions",
+    "structural": "passed structural candidate checks"
+  },
+  {
+    "child": "operations",
+    "column": "source_decision_id",
+    "parent": "stakeholder_decisions",
+    "structural": "passed structural candidate checks"
+  }
+]

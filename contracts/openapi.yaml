@@ -1,0 +1,1485 @@
+openapi: 3.1.2
+info:
+  title: SpecForge AI API contract design (not deployed)
+  version: 0.4.1-design-candidate
+  description: Design candidate v3.4, not deployed. Error object updated to RFC 9457; business acceptance and formal
+    OAS validation pending.
+servers:
+- url: https://api.example.invalid
+  description: Non-functional placeholder; DO NOT deploy or send credentials
+paths:
+  /v1/requirement-sets:
+    post:
+      operationId: post_v1_requirement_sets
+      summary: Create immutable source reference
+      security:
+      - BearerAuth: []
+      tags:
+      - SpecForge AI
+      x-required-scope: requirements:create
+      x-idempotent-command: true
+      responses:
+        '201':
+          description: Typed resource response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RequirementSet'
+        '400':
+          description: Invalid input
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '401':
+          description: Unauthenticated
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: Resource not found or not visible
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: Conflict/stale version
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: Semantic invalid
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '429':
+          description: Quota exceeded
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: Dependency unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 16
+          maxLength: 128
+        description: Unique per tenant/principal/action/request body; same key changed body returns 409.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRequirementSetRequest'
+  /v1/requirement-sets/{id}/requirements:
+    get:
+      operationId: get_v1_requirement_sets_id_requirements
+      summary: Read extracted requirements with provenance
+      security:
+      - BearerAuth: []
+      tags:
+      - SpecForge AI
+      x-required-scope: requirements:read
+      x-idempotent-command: false
+      responses:
+        '200':
+          description: Typed resource response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RequirementPage'
+        '400':
+          description: Invalid input
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '401':
+          description: Unauthenticated
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: Resource not found or not visible
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: Conflict/stale version
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: Semantic invalid
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '429':
+          description: Quota exceeded
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: Dependency unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 1024
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 50
+  /v1/requirement-sets/{id}/ambiguities:
+    get:
+      operationId: get_v1_requirement_sets_id_ambiguities
+      summary: Read outstanding stakeholder questions
+      security:
+      - BearerAuth: []
+      tags:
+      - SpecForge AI
+      x-required-scope: requirements:read
+      x-idempotent-command: false
+      responses:
+        '200':
+          description: Typed resource response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AmbiguityPage'
+        '400':
+          description: Invalid input
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '401':
+          description: Unauthenticated
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: Resource not found or not visible
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: Conflict/stale version
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: Semantic invalid
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '429':
+          description: Quota exceeded
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: Dependency unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 1024
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 50
+  /v1/ambiguities/{id}/decisions:
+    post:
+      operationId: post_v1_ambiguities_id_decisions
+      summary: Human decision stored with version lock
+      security:
+      - BearerAuth: []
+      tags:
+      - SpecForge AI
+      x-required-scope: requirements:decide
+      x-idempotent-command: true
+      responses:
+        '201':
+          description: Typed resource response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StakeholderDecision'
+        '400':
+          description: Invalid input
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '401':
+          description: Unauthenticated
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: Resource not found or not visible
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: Conflict/stale version
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: Semantic invalid
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '429':
+          description: Quota exceeded
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: Dependency unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 16
+          maxLength: 128
+        description: Unique per tenant/principal/action/request body; same key changed body returns 409.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecordDecisionRequest'
+  /v1/requirement-sets/{id}/spec-revisions:
+    post:
+      operationId: post_v1_requirement_sets_id_spec_revisions
+      summary: Queue bounded specification draft job
+      security:
+      - BearerAuth: []
+      tags:
+      - SpecForge AI
+      x-required-scope: spec:generate
+      x-idempotent-command: true
+      responses:
+        '202':
+          description: Durable job accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpecGenerationJob'
+        '400':
+          description: Invalid input
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '401':
+          description: Unauthenticated
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: Resource not found or not visible
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: Conflict/stale version
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: Semantic invalid
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '429':
+          description: Quota exceeded
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: Dependency unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 16
+          maxLength: 128
+        description: Unique per tenant/principal/action/request body; same key changed body returns 409.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateSpecRequest'
+  /v1/spec-revisions/{id}/traceability:
+    get:
+      operationId: get_v1_spec_revisions_id_traceability
+      summary: Return coverage counts and orphan operations
+      security:
+      - BearerAuth: []
+      tags:
+      - SpecForge AI
+      x-required-scope: spec:read
+      x-idempotent-command: false
+      responses:
+        '200':
+          description: Typed resource response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TraceabilityReport'
+        '400':
+          description: Invalid input
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '401':
+          description: Unauthenticated
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: Resource not found or not visible
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: Conflict/stale version
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: Semantic invalid
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '429':
+          description: Quota exceeded
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: Dependency unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+  /v1/spec-revisions/{id}/approve:
+    post:
+      operationId: post_v1_spec_revisions_id_approve
+      summary: Approve exact validated spec digest
+      security:
+      - BearerAuth: []
+      tags:
+      - SpecForge AI
+      x-required-scope: spec:approve
+      x-idempotent-command: true
+      responses:
+        '201':
+          description: Typed resource response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovedSpec'
+        '400':
+          description: Invalid input
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '401':
+          description: Unauthenticated
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: Resource not found or not visible
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: Conflict/stale version
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: Semantic invalid
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '429':
+          description: Quota exceeded
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: Dependency unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 16
+          maxLength: 128
+        description: Unique per tenant/principal/action/request body; same key changed body returns 409.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApproveSpecRequest'
+  /v1/artifacts/upload-intents:
+    post:
+      operationId: post__v1_artifacts_upload_intents
+      summary: Create scoped quarantine upload capability
+      security:
+      - BearerAuth: []
+      tags:
+      - CommonProductPlatform
+      x-required-scope: artifact:create
+      responses:
+        '201':
+          description: Typed result; subject to authorization
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadIntent'
+        '400':
+          description: 400 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '401':
+          description: 401 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: 403 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: 404 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: 409 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '413':
+          description: 413 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: 422 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '429':
+          description: 429 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: 503 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 16
+          maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUploadIntentRequest'
+      x-idempotent-command: true
+  /v1/artifacts/{artifact_id}/commit:
+    post:
+      operationId: post__v1_artifacts_artifact_id_commit
+      summary: Verify and quarantine committed object
+      security:
+      - BearerAuth: []
+      tags:
+      - CommonProductPlatform
+      x-required-scope: artifact:commit
+      responses:
+        '202':
+          description: Typed result; subject to authorization
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtifactRecord'
+        '400':
+          description: 400 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '401':
+          description: 401 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: 403 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: 404 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: 409 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '413':
+          description: 413 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: 422 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '429':
+          description: 429 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: 503 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      parameters:
+      - name: artifact_id
+        in: path
+        required: true
+        schema: &id001
+          type: string
+          format: uuid
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 16
+          maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommitUploadRequest'
+      x-idempotent-command: true
+  /v1/artifacts/{artifact_id}:
+    get:
+      operationId: get__v1_artifacts_artifact_id
+      summary: Read authorized artifact status
+      security:
+      - BearerAuth: []
+      tags:
+      - CommonProductPlatform
+      x-required-scope: artifact:read
+      responses:
+        '200':
+          description: Typed result; subject to authorization
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtifactRecord'
+        '400':
+          description: 400 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '401':
+          description: 401 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: 403 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: 404 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: 409 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '413':
+          description: 413 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: 422 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '429':
+          description: 429 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: 503 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      parameters:
+      - name: artifact_id
+        in: path
+        required: true
+        schema: *id001
+  /v1/artifacts/{artifact_id}/download-intents:
+    post:
+      operationId: post__v1_artifacts_artifact_id_download_intents
+      summary: Issue scoped artifact read capability
+      security:
+      - BearerAuth: []
+      tags:
+      - CommonProductPlatform
+      x-required-scope: artifact:download
+      responses:
+        '201':
+          description: Typed result; subject to authorization
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownloadIntent'
+        '400':
+          description: 400 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '401':
+          description: 401 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: 403 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: 404 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: 409 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '413':
+          description: 413 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: 422 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '429':
+          description: 429 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: 503 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      parameters:
+      - name: artifact_id
+        in: path
+        required: true
+        schema: *id001
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 16
+          maxLength: 128
+      x-idempotent-command: true
+  /v1/jobs/{job_id}:
+    get:
+      operationId: get__v1_jobs_job_id
+      summary: Read job lifecycle state
+      security:
+      - BearerAuth: []
+      tags:
+      - CommonProductPlatform
+      x-required-scope: job:read
+      responses:
+        '200':
+          description: Typed result; subject to authorization
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatus'
+        '400':
+          description: 400 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '401':
+          description: 401 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: 403 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: 404 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: 409 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '413':
+          description: 413 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: 422 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '429':
+          description: 429 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: 503 – typed error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      parameters:
+      - name: job_id
+        in: path
+        required: true
+        schema: *id001
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    RequirementSet:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - status
+      - created_at
+      - title
+      - source_version
+      - source_digest
+      - owner_id
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        title:
+          type: string
+        source_version:
+          type: integer
+        source_digest:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+        owner_id:
+          type: string
+          format: uuid
+    Requirement:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - set_id
+      - source_span
+      - statement
+      - requirement_type
+      - provenance_digest
+      properties:
+        id:
+          type: string
+          format: uuid
+        set_id:
+          type: string
+          format: uuid
+        source_span:
+          type: string
+        statement:
+          type: string
+        requirement_type:
+          type: string
+        provenance_digest:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+    Ambiguity:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - requirement_id
+      - severity
+      - question
+      - resolution_status
+      properties:
+        id:
+          type: string
+          format: uuid
+        requirement_id:
+          type: string
+          format: uuid
+        severity:
+          type: string
+        question:
+          type: string
+        resolution_status:
+          type: string
+    StakeholderDecision:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - status
+      - created_at
+      - ambiguity_id
+      - actor_id
+      - decision_hash
+      - source_reference
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        ambiguity_id:
+          type: string
+          format: uuid
+        actor_id:
+          type: string
+          format: uuid
+        decision_hash:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+        source_reference:
+          type: string
+    SpecGenerationJob:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - status
+      - created_at
+      - requirement_set_id
+      - input_version
+      - job_id
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        requirement_set_id:
+          type: string
+          format: uuid
+        input_version:
+          type: integer
+        job_id:
+          type: string
+          format: uuid
+    TraceabilityReport:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - status
+      - created_at
+      - revision_id
+      - total_requirements
+      - linked_requirements
+      - unlinked_operation_ids
+      - critical_open_ambiguities
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        revision_id:
+          type: string
+          format: uuid
+        total_requirements:
+          type: integer
+        linked_requirements:
+          type: integer
+        unlinked_operation_ids:
+          type: array
+          items:
+            type: string
+        critical_open_ambiguities:
+          type: integer
+    ApprovedSpec:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - status
+      - created_at
+      - revision_id
+      - spec_sha256
+      - approver_id
+      - approved_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        revision_id:
+          type: string
+          format: uuid
+        spec_sha256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+        approver_id:
+          type: string
+          format: uuid
+        approved_at:
+          type: string
+          format: date-time
+    CreateRequirementSetRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - title
+      - source_artifact_id
+      - source_sha256
+      properties:
+        title:
+          type: string
+        source_artifact_id:
+          type: string
+          format: uuid
+        source_sha256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+    RecordDecisionRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - decision_text
+      - source_reference
+      - expected_version
+      properties:
+        decision_text:
+          type: string
+        source_reference:
+          type: string
+        expected_version:
+          type: integer
+    GenerateSpecRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - source_version
+      - output_profile
+      properties:
+        source_version:
+          type: integer
+        output_profile:
+          type: string
+    ApproveSpecRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - spec_sha256
+      - expected_version
+      properties:
+        spec_sha256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+        expected_version:
+          type: integer
+    RequirementPage:
+      type: object
+      additionalProperties: false
+      required:
+      - items
+      - next_cursor
+      - has_more
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Requirement'
+        next_cursor:
+          type:
+          - string
+          - 'null'
+        has_more:
+          type: boolean
+    AmbiguityPage:
+      type: object
+      additionalProperties: false
+      required:
+      - items
+      - next_cursor
+      - has_more
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Ambiguity'
+        next_cursor:
+          type:
+          - string
+          - 'null'
+        has_more:
+          type: boolean
+    Problem:
+      type: object
+      description: RFC 9457 problem details, with stable application extension code and correlation request_id
+      additionalProperties: false
+      required:
+      - type
+      - title
+      - status
+      - code
+      - request_id
+      properties:
+        type:
+          type: string
+          format: uri-reference
+          description: Stable problem type URI; about:blank allowed
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri-reference
+        code:
+          type: string
+          pattern: ^[A-Z][A-Z0-9_]+$
+        request_id:
+          type: string
+          minLength: 1
+      example:
+        type: about:blank
+        title: Conflict
+        status: 409
+        detail: Resource version is stale
+        code: STALE_VERSION
+        request_id: request_example_001
+    CreateUploadIntentRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - kind
+      - filename
+      - size_bytes
+      - sha256
+      properties:
+        kind:
+          type: string
+          minLength: 1
+        filename:
+          type: string
+          minLength: 1
+        size_bytes:
+          type: integer
+          minimum: 1
+        sha256: &id002
+          type: string
+          pattern: ^[0-9a-f]{64}$
+        declared_media_type: &id003
+          type: string
+    UploadIntent:
+      type: object
+      additionalProperties: false
+      required:
+      - artifact_id
+      - status
+      - upload_url
+      - expires_at
+      - required_headers
+      properties:
+        artifact_id: *id001
+        status:
+          type: string
+          enum:
+          - INTENT_ISSUED
+        upload_url:
+          type: string
+          format: uri
+        expires_at: &id004
+          type: string
+          format: date-time
+        required_headers:
+          type: object
+          additionalProperties:
+            type: string
+    CommitUploadRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - sha256
+      - size_bytes
+      - object_generation
+      properties:
+        sha256: *id002
+        size_bytes:
+          type: integer
+          minimum: 1
+        object_generation:
+          type: string
+          minLength: 1
+    ArtifactRecord:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - status
+      - kind
+      - sha256
+      - size_bytes
+      - created_at
+      properties:
+        id: *id001
+        status:
+          type: string
+          enum:
+          - INTENT_ISSUED
+          - QUARANTINED
+          - VALIDATING
+          - AVAILABLE
+          - REJECTED
+          - EXPIRED
+          - DELETED
+        kind: *id003
+        sha256: *id002
+        size_bytes:
+          type: integer
+          minimum: 0
+        created_at: *id004
+        rejected_reason:
+          type:
+          - string
+          - 'null'
+    DownloadIntent:
+      type: object
+      additionalProperties: false
+      required:
+      - artifact_id
+      - download_url
+      - expires_at
+      - object_generation
+      properties:
+        artifact_id: *id001
+        download_url:
+          type: string
+          format: uri
+        expires_at: *id004
+        object_generation: *id003
+    JobStatus:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - kind
+      - state
+      - created_at
+      - state_version
+      - attempt_count
+      properties:
+        id: *id001
+        kind: *id003
+        state:
+          type: string
+          enum:
+          - PENDING
+          - RUNNING
+          - WAITING_APPROVAL
+          - SUCCEEDED
+          - FAILED_RETRYABLE
+          - FAILED_TERMINAL
+          - CANCELLED
+          - BLOCKED
+          - RECONCILIATION_REQUIRED
+        created_at: *id004
+        state_version:
+          type: integer
+          minimum: 1
+        attempt_count:
+          type: integer
+          minimum: 0
+        last_error_code:
+          type:
+          - string
+          - 'null'
+x-design-status: REVIEW_REQUIRED_NOT_IMPLEMENTED
