@@ -26,6 +26,9 @@ def test_postgres_revision_decision_approval_and_tenant_boundaries(monkeypatch):
         db.execute((root/'infra/environments/staging/003_fk_lookup_index.sql').read_text())
         definition = db.execute("SELECT pg_get_indexdef('idx_requirements_tenant_set'::regclass)").fetchone()[0]
         assert 'requirements USING btree (tenant_id, set_id)' in definition
+        db.execute((root/'infra/environments/staging/004_tenant_rls_initplan.sql').read_text())
+        policy = db.execute("SELECT qual, with_check FROM pg_policies WHERE schemaname=current_schema() AND tablename='requirements' AND policyname='requirements_tenant'").fetchone()
+        assert policy and all('SELECT current_setting' in expression for expression in policy)
         db.execute("CREATE ROLE fw_runtime_test LOGIN NOSUPERUSER NOBYPASSRLS PASSWORD 'synthetic-local-runtime-test-only'")
         db.execute('GRANT fw_specforge_ai_rw TO fw_runtime_test')
         db.execute('INSERT INTO tenants VALUES(%s,%s,%s)',(TENANT,'synthetic-demo','ACTIVE'))
