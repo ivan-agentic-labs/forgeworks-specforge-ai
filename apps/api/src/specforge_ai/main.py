@@ -212,6 +212,8 @@ def create_app(db_path: str | None = None, seed: bool = False):
                 reject(404, "RESOURCE_NOT_FOUND", "Requirement set is not visible")
             if status == "OPEN_AMBIGUITY":
                 reject(409, "OPEN_AMBIGUITY", "Resolve all high-impact ambiguities before generation")
+            if status == "OUTPUT_PROFILE_UNSUPPORTED" or status.startswith("EXPLICIT_ENDPOINT_") or status == "SOURCE_HAS_NO_REQUIREMENTS":
+                reject(422, status, "Explicit source lines must declare METHOD /path -> STATUS | description without duplicates or ambiguous templates")
             if status == "SOURCE_VERSION_STALE":
                 reject(409, "STALE_VERSION", "Requirement source version is stale")
             job_row = store.job_for_revision(claims["tenant_id"], revision["id"])
@@ -219,6 +221,16 @@ def create_app(db_path: str | None = None, seed: bool = False):
                 reject(503, "JOB_NOT_PERSISTED", "Durable generation job was not persisted")
             return {"id": revision["id"], "status": revision["status"], "created_at": revision["created_at"], "requirement_set_id": str(sid), "input_version": revision["source_version"], "job_id": job_row["id"], "spec_sha256": revision["spec_sha"]}
         return idempotent(claims, f"generate:{sid}", idempotency_key, body.model_dump(), operation)
+
+    @app.get("/v1/spec-revisions/{rid}/openapi")
+    def download_openapi(rid: UUID, claims=Depends(scope("spec:read", store))):
+        row = store.get_revision(claims["tenant_id"], str(rid))
+        if not row:
+            reject(404, "RESOURCE_NOT_FOUND", "Revision is not visible")
+        body = row["spec_json"].encode("utf-8")
+        if hashlib.sha256(body).hexdigest() != row["spec_sha"]:
+            reject(409, "SPEC_INTEGRITY_FAILURE", "Stored OpenAPI bytes do not match the immutable revision digest")
+        return Response(body, media_type="application/json", headers={"Cache-Control": "no-store", "Content-Disposition": f'attachment; filename="spec-{rid}.json"', "X-Spec-SHA256": row["spec_sha"], "ETag": '"' + row["spec_sha"] + '"'})
 
     @app.get("/v1/spec-revisions/{rid}/traceability")
     def trace(rid: UUID, claims=Depends(scope("spec:read", store))):

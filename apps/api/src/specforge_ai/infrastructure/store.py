@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from specforge_ai.domain.explicit_endpoints import EndpointDeclarationError, explicit_paths
 from specforge_ai.domain.openapi_semantics import canonical_json, sha256_json, validate_generated_openapi
 
 TENANT = "00000000-0000-0000-0000-000000000001"
@@ -171,6 +172,8 @@ class Store:
             open_ambiguities = [a for a in self.amb(tenant_id, set_id) if a["status"] == "OPEN" and a["severity"] in {"HIGH", "CRITICAL"}]
             if open_ambiguities:
                 return None, "OPEN_AMBIGUITY"
+            if profile not in {"openapi31", "openapi31-explicit-v1"}:
+                return None, "OUTPUT_PROFILE_UNSUPPORTED"
             requirements = self.reqs(tenant_id, set_id)
             snapshot = self._decision_snapshot(db, tenant_id, set_id)
             revision_id, job_id = str(uuid.uuid4()), str(uuid.uuid4())
@@ -191,11 +194,17 @@ class Store:
                         "responses": {"200": {"description": "Successful response"}},
                     }
                 }
+            if profile == "openapi31-explicit-v1":
+                try:
+                    paths = explicit_paths(requirements, cases)
+                except EndpointDeclarationError as error:
+                    return None, str(error)
             spec = {
                 "openapi": "3.1.0",
                 "info": {"title": requirement_set["title"], "version": "0.1.0"},
                 "x-deterministic-output": True,
-                "x-generator": "specforge-ai.deterministic.v1",
+                "x-generator": "specforge-ai.explicit.v1" if profile == "openapi31-explicit-v1" else "specforge-ai.deterministic.v1",
+                "x-output-profile": profile,
                 "paths": paths,
             }
             report = validate_generated_openapi(spec, [r["id"] for r in requirements], [case[0] for case in cases])
@@ -207,7 +216,7 @@ class Store:
             created = now()
             db.execute("INSERT INTO revisions(tenant_id,id,set_id,source_version,status,spec_json,spec_sha,version,source_decision_digest,validator_report_json,validator_report_sha,traceability_report_json,traceability_report_sha,stale_reason,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (tenant_id, revision_id, set_id, source_version, "GENERATED" if report["valid"] else "VALIDATION_FAILED", raw_spec, spec_sha, 1, snapshot, canonical_json(report), report_sha, canonical_json(trace), trace_sha, None, created))
             for case_id, requirement_id in cases:
-                db.execute("INSERT INTO acceptance_cases VALUES(?,?,?,?,?,?,?)", (tenant_id, case_id, revision_id, requirement_id, f"{revision_id}:{requirement_id}", "The generated operation satisfies the source requirement with a successful response.", "PENDING"))
+                db.execute("INSERT INTO acceptance_cases VALUES(?,?,?,?,?,?,?)", (tenant_id, case_id, revision_id, requirement_id, f"{revision_id}:{requirement_id}", "Verify the source-declared HTTP operation and response; schema and behavior require stakeholder acceptance." if profile == "openapi31-explicit-v1" else "The generated operation satisfies the source requirement with a successful response.", "PENDING"))
             db.execute("INSERT INTO jobs(tenant_id,id,revision_id,state,created_at,state_version,attempt_count,max_attempts,next_attempt_at,last_error_code,last_error_message,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)", (tenant_id, job_id, revision_id, "PENDING", created, 1, 0, 3, created, None, None, created))
         # The deterministic local job is executed after its durable row is committed.
         self.run_job(tenant_id, job_id)
@@ -215,7 +224,7 @@ class Store:
 
     @staticmethod
     def _trace_report(requirements: list[sqlite3.Row], spec: dict[str, Any], cases: list[tuple[str, str]], open_ambiguities: list[sqlite3.Row]) -> dict[str, Any]:
-        operations = [(path, method, op) for path, item in spec.get("paths", {}).items() for method, op in item.items() if method in {"get", "post", "put", "patch", "delete"}]
+        operations = [(path, method, op) for path, item in spec.get("paths", {}).items() for method, op in item.items() if method in {"get", "post", "put", "patch", "delete", "head", "options", "trace"}]
         linked = {op.get("x-requirement-id") for _, _, op in operations if op.get("x-requirement-id")}
         operation_ids = {op.get("operationId") for _, _, op in operations}
         linked_cases = {case_id for op in (op for _, _, op in operations) for case_id in op.get("x-acceptance-case-ids", [])}

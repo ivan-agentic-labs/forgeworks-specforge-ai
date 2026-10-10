@@ -48,3 +48,7 @@ See [current changes and residual gaps](docs/evidence/ENGINEERING_CONTINUATION.m
 See [current G1/G2 evidence](docs/verification/CURRENT_GATE_EVIDENCE.md), [exact source receipt](docs/evidence/MAIN_VERIFICATION_2026-10-09.json), and [owner main authorization](docs/governance/ENGINEERING_MAIN_AUTHORIZATION_2026-10-09.md). PostgreSQL adapters exist for all five independent projects. Historical evidence retains its source SHA and narrower scope.
 
 The requirement flow now consumes actual integrity-checked UTF-8 source bytes. Local development/test upload and download capabilities are short-lived, tenant-bound, generation-bound and limited to 1 MiB; requirement statements and provenance digests are derived from those bytes. External object storage, malware scanning and retention/deletion evidence remain open.
+
+## Explicit source-declared APIs
+
+[Generate and download source-declared HTTP operations](docs/architecture/EXPLICIT_ENDPOINT_PROFILE.md) with the `openapi31-explicit-v1` profile. Method/path/status and traceability come from actual source declarations; schema and stakeholder acceptance remain open. [Scoped verification](docs/evidence/EXPLICIT_ENDPOINTS_2026-10-11.md).

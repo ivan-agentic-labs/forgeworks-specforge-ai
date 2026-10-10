@@ -432,6 +432,48 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenerateSpecRequest'
+  /v1/spec-revisions/{id}/openapi:
+    get:
+      operationId: get_v1_spec_revisions_id_openapi
+      summary: Download immutable digest-verified generated OpenAPI bytes
+      security:
+      - BearerAuth: []
+      x-required-scope: spec:read
+      x-idempotent-command: false
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Exact generated OpenAPI JSON; caller must have spec:read scope
+          headers:
+            X-Spec-SHA256:
+              schema:
+                type: string
+                pattern: ^[0-9a-f]{64}$
+            ETag:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '401':
+          description: Authentication required
+        '403':
+          description: Scope or active membership is required
+        '404':
+          description: Revision is not visible to this tenant
+        '409':
+          description: Stored bytes do not match the immutable revision digest
   /v1/spec-revisions/{id}/traceability:
     get:
       operationId: get_v1_spec_revisions_id_traceability
@@ -1329,6 +1371,7 @@ components:
           type: integer
         output_profile:
           type: string
+          description: Supported profiles are openapi31 (placeholder review skeleton) and openapi31-explicit-v1 (source-declared HTTP operations).
     ApproveSpecRequest:
       type: object
       additionalProperties: false
