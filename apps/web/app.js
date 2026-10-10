@@ -2,7 +2,16 @@
   'use strict';
   const $ = (id) => document.getElementById(id);
   const state = { ambiguities: [], requirements: [], revision: null, trace: null };
-  const configuredBase = window.SPECFORGE_API_BASE || new URLSearchParams(location.search).get('api_base') || localStorage.getItem('specforge.apiBase') || location.origin;
+  function initialApiBase(candidate, trustedBase) {
+    try {
+      const trusted = new URL(trustedBase, location.origin);
+      const selected = new URL(candidate || trustedBase, location.origin);
+      if (!/^https?:$/.test(selected.protocol) || selected.origin !== trusted.origin || selected.username || selected.password || selected.search || selected.hash) return trustedBase;
+      return selected.href.replace(/\/$/, '');
+    } catch (_) { return trustedBase; }
+  }
+  const trustedBase = window.SPECFORGE_API_BASE || location.origin;
+  const configuredBase = initialApiBase(new URLSearchParams(location.search).get('api_base') || localStorage.getItem('specforge.apiBase'), trustedBase);
   $('api-base').value = configuredBase;
 
   function apiBase() { return $('api-base').value.trim().replace(/\/$/, '') || location.origin; }
