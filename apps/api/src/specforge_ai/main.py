@@ -21,6 +21,8 @@ from specforge_ai.domain.openapi_semantics import canonical_json
 
 from specforge_ai.presentation.body_budget import BodyBudgetMiddleware
 
+from specforge_ai.presentation.role_policy import role_scope_allowed
+
 ROOT = Path(__file__).resolve().parents[4]
 
 
@@ -81,8 +83,10 @@ def auth(authorization: Annotated[str | None, Header()] = None):
 def scope(required: str, store: Store):
     def dependency(claims=Depends(auth)):
         verify_session(store, claims)
-        if not claims.get("tenant_id") or not claims.get("sub") or not store.member(claims["tenant_id"], claims["sub"]):
+        if not claims.get("tenant_id") or not claims.get("sub") or store.member_role(claims["tenant_id"], claims["sub"]) is None:
             reject(403, "TENANT_CONTEXT_INVALID", "Verified membership is required")
+        if not role_scope_allowed(store.member_role(claims["tenant_id"], claims["sub"]), required):
+            reject(403, "ROLE_FORBIDDEN", "Membership role cannot perform this operation")
         if required not in set(str(claims.get("scope", "")).split()):
             reject(403, "INSUFFICIENT_SCOPE", f"Scope {required} is required")
         return claims
