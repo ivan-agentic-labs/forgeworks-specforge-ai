@@ -27,6 +27,35 @@ def _report(errors: Iterable[str], warnings: Iterable[str] = ()) -> dict[str, An
     }
 
 
+def _declared_path_parameters(raw: Any, location: str, errors: list[str]) -> set[str]:
+    """Validate effective OpenAPI path bindings, rejecting ambiguous duplicates."""
+    if not isinstance(raw, list):
+        errors.append(f"{location}: parameters must be an array")
+        return set()
+    names: set[str] = set()
+    seen: set[tuple[str, str]] = set()
+    for index, param in enumerate(raw):
+        prefix = f"{location}: parameter {index}"
+        if not isinstance(param, dict):
+            errors.append(f"{prefix} must be an object")
+            continue
+        name, scope = param.get("name"), param.get("in")
+        if not isinstance(name, str) or not name or not isinstance(scope, str):
+            errors.append(f"{prefix} requires a name and location")
+            continue
+        identity = (scope, name)
+        if identity in seen:
+            errors.append(f"{location}: duplicate parameter {scope}:{name}")
+        seen.add(identity)
+        if scope == "path":
+            names.add(name)
+            if param.get("required") is not True:
+                errors.append(f"{prefix}: path parameter must be required")
+            if not isinstance(param.get("schema"), dict):
+                errors.append(f"{prefix}: path parameter schema must be an object")
+    return names
+
+
 def validate_generated_openapi(spec: dict[str, Any], requirement_ids: Iterable[str], acceptance_ids: Iterable[str]) -> dict[str, Any]:
     """Return a stable report for structural and requirement trace semantics."""
     requirement_ids = set(requirement_ids)
@@ -55,7 +84,7 @@ def validate_generated_openapi(spec: dict[str, Any], requirement_ids: Iterable[s
         if not isinstance(item, dict):
             errors.append(f"{path}: path item must be an object")
             continue
-        path_params = {p.get("name") for p in item.get("parameters", []) if isinstance(p, dict) and p.get("in") == "path"}
+        path_params = _declared_path_parameters(item.get("parameters", []), path, errors)
         for method, operation in sorted(item.items()):
             if method.startswith("x-") or method in {"summary", "description", "parameters", "servers"}:
                 continue
@@ -75,15 +104,19 @@ def validate_generated_openapi(spec: dict[str, Any], requirement_ids: Iterable[s
                 errors.append(f"{path} {method}: responses are required")
             req_id = operation.get("x-requirement-id")
             if req_id is not None:
-                if req_id not in requirement_ids:
-                    errors.append(f"{path} {method}: unknown x-requirement-id {req_id}")
-                linked_requirements.append(req_id)
+                if not isinstance(req_id, str) or req_id not in requirement_ids:
+                    errors.append(f"{path} {method}: unknown x-requirement-id")
+                else:
+                    linked_requirements.append(req_id)
             case_ids = operation.get("x-acceptance-case-ids", [])
-            if not isinstance(case_ids, list) or any(case_id not in acceptance_ids for case_id in case_ids):
+            if not isinstance(case_ids, list) or any(not isinstance(case_id, str) or case_id not in acceptance_ids for case_id in case_ids):
                 errors.append(f"{path} {method}: x-acceptance-case-ids contains an unknown case")
-            linked_acceptance.extend(case_ids if isinstance(case_ids, list) else [])
-            params = list(item.get("parameters", [])) + list(operation.get("parameters", []))
-            declared = {p.get("name") for p in params if isinstance(p, dict) and p.get("in") == "path"}
+            elif len(set(case_ids)) != len(case_ids):
+                errors.append(f"{path} {method}: duplicate acceptance case reference")
+            else:
+                linked_acceptance.extend(case_ids)
+            operation_params = _declared_path_parameters(operation.get("parameters", []), f"{path} {method}", errors)
+            declared = path_params | operation_params
             placeholders = {part[1:-1] for part in path.split("/") if part.startswith("{") and part.endswith("}")}
             if placeholders != declared:
                 errors.append(f"{path} {method}: path parameter mismatch")
