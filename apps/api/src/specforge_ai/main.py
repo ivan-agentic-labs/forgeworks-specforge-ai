@@ -83,9 +83,12 @@ def auth(authorization: Annotated[str | None, Header()] = None):
 def scope(required: str, store: Store):
     def dependency(claims=Depends(auth)):
         verify_session(store, claims)
-        if not claims.get("tenant_id") or not claims.get("sub") or store.member_role(claims["tenant_id"], claims["sub"]) is None:
+        if not claims.get("tenant_id") or not claims.get("sub"):
             reject(403, "TENANT_CONTEXT_INVALID", "Verified membership is required")
-        if not role_scope_allowed(store.member_role(claims["tenant_id"], claims["sub"]), required):
+        role = store.member_role(claims["tenant_id"], claims["sub"])
+        if role is None:
+            reject(403, "TENANT_CONTEXT_INVALID", "Verified membership is required")
+        if not role_scope_allowed(role, required):
             reject(403, "ROLE_FORBIDDEN", "Membership role cannot perform this operation")
         if required not in set(str(claims.get("scope", "")).split()):
             reject(403, "INSUFFICIENT_SCOPE", f"Scope {required} is required")
