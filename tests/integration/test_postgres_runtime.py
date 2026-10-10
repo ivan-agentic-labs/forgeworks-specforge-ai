@@ -46,6 +46,23 @@ def test_postgres_revision_decision_approval_and_tenant_boundaries(monkeypatch):
         PostgresStore(owner)
     store=PostgresStore(runtime)
     assert store.member_role(TENANT, USER) == 'editor'
+    # Verify an actual status change revokes authorization immediately.
+    # This runs against the explicitly disposable localhost PostgreSQL fixture.
+    with psycopg.connect(owner) as provisioning:
+        result = provisioning.execute(
+            "UPDATE memberships SET status='REVOKED' WHERE tenant_id=%s AND user_id=%s",
+            (TENANT, USER),
+        )
+        assert result.rowcount == 1
+    assert store.member_role(TENANT, USER) is None
+    with psycopg.connect(owner) as provisioning:
+        result = provisioning.execute(
+            "UPDATE memberships SET status='ACTIVE' WHERE tenant_id=%s AND user_id=%s",
+            (TENANT, USER),
+        )
+        assert result.rowcount == 1
+    assert store.member_role(TENANT, USER) == 'editor'
+
     assert store.member_role(TENANT, 'not-a-uuid') is None
     assert not store.member(TENANT, "unmapped-oidc-subject")
     # Runtime login and its group cannot own tenant/provisioning tables either.
