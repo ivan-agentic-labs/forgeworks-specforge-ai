@@ -108,6 +108,20 @@ class PostgresStore(Store):
             return bool(row["active"])
 
     @tenant_method
+    def member_role(self, tenant, user):
+        """Fetch role under the tenant-scoped runtime role, not a privileged login."""
+        try:
+            user = str(UUID(str(user)))
+        except (ValueError, TypeError):
+            return None
+        with self.conn() as db:
+            row = db.execute(
+                "SELECT role FROM memberships WHERE tenant_id=? AND user_id=? AND status='ACTIVE'",
+                (tenant, user),
+            ).fetchone()
+            return str(row["role"]) if row else None
+
+    @tenant_method
     def member(self, tenant, user):
         try:
             user = str(UUID(str(user)))
