@@ -88,6 +88,15 @@ class Store:
             db.execute("INSERT OR IGNORE INTO tenants VALUES(?,?,?)", (TENANT, "synthetic-demo", "ACTIVE"))
             db.execute("INSERT OR IGNORE INTO memberships VALUES(?,?,?,?)", (TENANT, USER, "editor", "ACTIVE"))
 
+    def member_role(self, tenant: str, user: str) -> str | None:
+        """Read current ACTIVE member role without trusting JWT-supplied role."""
+        with self.conn() as db:
+            row = db.execute(
+                "SELECT role FROM memberships WHERE tenant_id=? AND user_id=? AND status='ACTIVE'",
+                (tenant, user),
+            ).fetchone()
+            return str(row["role"]) if row else None
+
     def member(self, tenant_id: str, user_id: str) -> bool:
         with self.conn() as db:
             return db.execute("SELECT 1 FROM memberships WHERE tenant_id=? AND user_id=? AND status='ACTIVE'", (tenant_id, user_id)).fetchone() is not None
