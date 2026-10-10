@@ -15,6 +15,10 @@ class Stub:
 
 @pytest.mark.parametrize(("role","scope_name","allowed"), [
     ("viewer","job:read",True),
+    ("VIEWER", "job:read", True),
+    ("VIEWER", "artifact:create", False),
+    ("OWNER", "artifact:create", True),
+    ("REVOKED", "job:read", False),
     ("viewer","artifact:read",True),
     ("viewer","artifact:create",False),
     ("viewer","report:approve",False),
