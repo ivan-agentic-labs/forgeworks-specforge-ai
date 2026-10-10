@@ -35,6 +35,17 @@ def test_postgres_revision_decision_approval_and_tenant_boundaries(monkeypatch):
 
         policy = db.execute("SELECT qual, with_check FROM pg_policies WHERE schemaname=current_schema() AND tablename='requirements' AND policyname='requirements_tenant'").fetchone()
         assert policy and all('SELECT current_setting' in expression for expression in policy)
+        # Run twice to prove replay safety, then inspect actual catalog definitions.
+        for _ in range(2):
+            db.execute((root/'infra/environments/staging/007_remaining_fk_indexes.sql').read_text())
+        definition = db.execute("SELECT pg_get_indexdef('idx_acceptance_cases_tenant_requirement'::regclass)").fetchone()[0]
+        assert 'acceptance_cases USING btree (tenant_id, requirement_id)' in definition
+        definition = db.execute("SELECT pg_get_indexdef('idx_ambiguities_tenant_requirement'::regclass)").fetchone()[0]
+        assert 'ambiguities USING btree (tenant_id, requirement_id)' in definition
+        definition = db.execute("SELECT pg_get_indexdef('idx_jobs_tenant_revision'::regclass)").fetchone()[0]
+        assert 'jobs USING btree (tenant_id, revision_id)' in definition
+        definition = db.execute("SELECT pg_get_indexdef('idx_spec_revisions_tenant_set'::regclass)").fetchone()[0]
+        assert 'spec_revisions USING btree (tenant_id, set_id)' in definition
         db.execute("CREATE ROLE fw_runtime_test LOGIN NOSUPERUSER NOBYPASSRLS PASSWORD 'synthetic-local-runtime-test-only'")
         db.execute('GRANT fw_specforge_ai_rw TO fw_runtime_test')
         db.execute('INSERT INTO tenants VALUES(%s,%s,%s)',(TENANT,'synthetic-demo','ACTIVE'))
