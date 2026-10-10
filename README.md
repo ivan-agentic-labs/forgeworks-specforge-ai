@@ -1,6 +1,6 @@
 # SpecForge AI
 
-**Status: synthetic MVP milestone and static review console implemented and tested locally. Not deployed or production-ready.**
+**Status: synthetic MVP deployed to Railway staging, with scoped CI evidence. Not production-ready; G1-E and authenticated customer acceptance remain open.**
 
 Traceable requirements-to-API specifications, review and acceptance tests.
 
