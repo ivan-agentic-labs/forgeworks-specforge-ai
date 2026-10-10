@@ -27,6 +27,12 @@ def test_postgres_revision_decision_approval_and_tenant_boundaries(monkeypatch):
         definition = db.execute("SELECT pg_get_indexdef('idx_requirements_tenant_set'::regclass)").fetchone()[0]
         assert 'requirements USING btree (tenant_id, set_id)' in definition
         db.execute((root/'infra/environments/staging/004_tenant_rls_initplan.sql').read_text())
+        db.execute((root/'infra/environments/staging/005_remaining_tenant_rls_initplans.sql').read_text())
+        for table, policy_name in [['acceptance_cases','acceptance_cases_tenant'],['ambiguities','tenant_boundary'],['artifacts','artifacts_tenant'],['idempotency_records','tenant_boundary'],['jobs','jobs_tenant'],['memberships','tenant_boundary'],['requirement_sets','requirement_sets_tenant'],['spec_revisions','spec_revisions_tenant'],['stakeholder_decisions','stakeholder_decisions_tenant']]:
+            row = db.execute("SELECT qual, with_check, cmd, roles FROM pg_policies WHERE schemaname=current_schema() AND tablename=%s AND policyname=%s", (table, policy_name)).fetchone()
+            assert row and row[2] == 'ALL' and row[3] == ['public']
+            assert all('SELECT current_setting' in clause for clause in row[:2])
+
         policy = db.execute("SELECT qual, with_check FROM pg_policies WHERE schemaname=current_schema() AND tablename='requirements' AND policyname='requirements_tenant'").fetchone()
         assert policy and all('SELECT current_setting' in expression for expression in policy)
         db.execute("CREATE ROLE fw_runtime_test LOGIN NOSUPERUSER NOBYPASSRLS PASSWORD 'synthetic-local-runtime-test-only'")
