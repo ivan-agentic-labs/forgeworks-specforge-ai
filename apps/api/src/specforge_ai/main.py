@@ -19,6 +19,8 @@ from specforge_ai.infrastructure.store import Store
 from specforge_ai.infrastructure.local_artifacts import LocalArtifacts, MAX_BYTES
 from specforge_ai.domain.openapi_semantics import canonical_json
 
+from specforge_ai.presentation.body_budget import BodyBudgetMiddleware
+
 ROOT = Path(__file__).resolve().parents[4]
 
 
@@ -125,6 +127,7 @@ def create_app(db_path: str | None = None, seed: bool = False):
     if seed:
         store.seed()
     app = FastAPI(title="SpecForge AI MVP", version="0.2.0")
+    app.add_middleware(BodyBudgetMiddleware)
     app.state.store = store
 
     def idempotent(claims, action: str, key: str | None, payload: dict, operation):
