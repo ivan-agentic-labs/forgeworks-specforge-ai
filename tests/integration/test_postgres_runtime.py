@@ -23,6 +23,9 @@ def test_postgres_revision_decision_approval_and_tenant_boundaries(monkeypatch):
             pytest.fail('Proof requires a fresh empty database')
         for name in ['001_specforge_mvp.sql','002_specforge_runtime.sql']:
             db.execute((root/'migrations/versions'/name).read_text())
+        db.execute((root/'infra/environments/staging/003_fk_lookup_index.sql').read_text())
+        definition = db.execute("SELECT pg_get_indexdef('idx_requirements_tenant_set'::regclass)").fetchone()[0]
+        assert 'requirements USING btree (tenant_id, set_id)' in definition
         db.execute("CREATE ROLE fw_runtime_test LOGIN NOSUPERUSER NOBYPASSRLS PASSWORD 'synthetic-local-runtime-test-only'")
         db.execute('GRANT fw_specforge_ai_rw TO fw_runtime_test')
         db.execute('INSERT INTO tenants VALUES(%s,%s,%s)',(TENANT,'synthetic-demo','ACTIVE'))
