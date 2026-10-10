@@ -44,3 +44,7 @@ See `docs/evidence/STAGING_DEPLOYMENT_2026-10-10.json` for deployment IDs, sourc
 ## Additive foreign-key index rollout
 
 After bootstrap, execute `003_fk_lookup_index.sql` using the migration role with `search_path` set to `fw_specforge_ai, pg_catalog`. Verify `idx_requirements_tenant_set` on `requirements (tenant_id, set_id)`, rerun the Supabase advisor, and retain rollback: `DROP INDEX IF EXISTS fw_specforge_ai.idx_requirements_tenant_set;` (only after query-plan review). This closes one index finding, **not** a measured application latency requirement.
+
+## Staging tenant RLS initPlan optimization
+
+Only after green disposable PostgreSQL cross-tenant tests, run `004_tenant_rls_initplan.sql` under the migration role with `search_path=fw_specforge_ai,pg_catalog`. The same tenant equality remains in USING/WITH CHECK. Confirm `pg_policies` and Supabase advisor; do not claim a latency improvement without load measurements. Rollback requires restoring the original `requirements_tenant` predicate in a reviewed migration.
