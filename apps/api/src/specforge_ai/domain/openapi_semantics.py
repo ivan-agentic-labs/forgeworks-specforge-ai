@@ -151,6 +151,11 @@ def validate_generated_openapi(spec: dict[str, Any], requirement_ids: Iterable[s
     missing_cases = sorted(acceptance_ids - set(linked_acceptance))
     if missing_cases:
         errors.append("unlinked acceptance cases: " + ",".join(missing_cases))
+    # A case must bind to one operation exactly. Reusing the same case on
+    # distinct operations yields an apparently complete but misleading audit.
+    duplicate_cases = sorted(name for name, count in Counter(linked_acceptance).items() if count > 1)
+    if duplicate_cases:
+        errors.append("acceptance cases linked more than once: " + ",".join(duplicate_cases))
     if spec.get("x-deterministic-output") is not True:
         warnings.append("document does not explicitly label deterministic output")
     return _report(errors, warnings)
