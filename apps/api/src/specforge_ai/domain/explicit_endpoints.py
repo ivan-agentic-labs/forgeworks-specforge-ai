@@ -11,6 +11,19 @@ class EndpointDeclarationError(ValueError):
 
 
 def explicit_paths(requirements, cases):
+    # Never silently discard requirements via zip() or attach another
+    # requirement's acceptance case to an emitted operation.
+    if len(requirements) != len(cases):
+        raise EndpointDeclarationError("EXPLICIT_ENDPOINT_CASE_ALIGNMENT_INVALID")
+    if any(
+        not isinstance(case, (tuple, list))
+        or len(case) != 2
+        or case[1] != requirement["id"]
+        for requirement, case in zip(requirements, cases)
+    ):
+        raise EndpointDeclarationError("EXPLICIT_ENDPOINT_CASE_ALIGNMENT_INVALID")
+    if len({case[0] for case in cases}) != len(cases):
+        raise EndpointDeclarationError("EXPLICIT_ENDPOINT_CASE_DUPLICATE")
     paths, template_paths = {}, {}
     for requirement, (case_id, _) in zip(requirements, cases):
         statement = requirement["statement"]
