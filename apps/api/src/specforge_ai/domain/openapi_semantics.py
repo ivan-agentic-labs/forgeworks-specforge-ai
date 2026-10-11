@@ -8,11 +8,13 @@ from __future__ import annotations
 
 import json
 import hashlib
+import re
 from collections import Counter
 from typing import Any, Iterable
 
 
 _METHODS = {"get", "put", "post", "delete", "options", "head", "patch", "trace"}
+_TEMPLATE = re.compile(r"\{([^{}\/]+)\}")
 
 
 def _report(errors: Iterable[str], warnings: Iterable[str] = ()) -> dict[str, Any]:
@@ -74,6 +76,9 @@ def validate_generated_openapi(spec: dict[str, Any], requirement_ids: Iterable[s
         errors.append("paths must contain at least one path")
         paths = {}
 
+    # Distinct template variable names do not make two otherwise identical
+    # OpenAPI paths distinguishable. Track normalized route signatures.
+    route_signatures: dict[str, str] = {}
     operation_ids: list[str] = []
     linked_requirements: list[str] = []
     linked_acceptance: list[str] = []
@@ -84,11 +89,25 @@ def validate_generated_openapi(spec: dict[str, Any], requirement_ids: Iterable[s
         if not isinstance(item, dict):
             errors.append(f"{path}: path item must be an object")
             continue
+        matches = list(_TEMPLATE.finditer(path))
+        # Reject malformed/unbalanced braces rather than silently treating
+        # them as literal path segments.
+        remainder = _TEMPLATE.sub("", path)
+        if "{" in remainder or "}" in remainder:
+            errors.append(f"{path}: invalid path template syntax")
+        signature = _TEMPLATE.sub("{}", path)
+        if matches and signature in route_signatures:
+            errors.append(f"{path}: indistinguishable templated paths: {route_signatures[signature]}")
+        else:
+            route_signatures[signature] = path
+        placeholders = {match.group(1) for match in matches}
+        if len(placeholders) != len(matches):
+            errors.append(f"{path}: duplicate path template variable")
         path_params = _declared_path_parameters(item.get("parameters", []), path, errors)
         for method, operation in sorted(item.items()):
             if method.startswith("x-") or method in {"summary", "description", "parameters", "servers"}:
                 continue
-            if method.lower() not in _METHODS:
+            if method not in _METHODS:
                 errors.append(f"{path}: unsupported path item {method}")
                 continue
             if not isinstance(operation, dict):
@@ -117,7 +136,6 @@ def validate_generated_openapi(spec: dict[str, Any], requirement_ids: Iterable[s
                 linked_acceptance.extend(case_ids)
             operation_params = _declared_path_parameters(operation.get("parameters", []), f"{path} {method}", errors)
             declared = path_params | operation_params
-            placeholders = {part[1:-1] for part in path.split("/") if part.startswith("{") and part.endswith("}")}
             if placeholders != declared:
                 errors.append(f"{path} {method}: path parameter mismatch")
 
