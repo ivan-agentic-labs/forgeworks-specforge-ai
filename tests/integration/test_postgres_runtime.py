@@ -114,6 +114,30 @@ def test_postgres_revision_decision_approval_and_tenant_boundaries(monkeypatch):
     assert status=='OK' and revision['status']=='GENERATED'
     assert store.job_for_revision(TENANT,revision['id'])['state']=='SUCCEEDED'
     assert store.trace(TENANT,revision['id'])['status']=='VERIFIED'
+    # Exercise claim boundaries with actual tenant-scoped PostgreSQL rows.
+    def fixture_job(state, attempts):
+        job_id = str(uuid4())
+        with store.conn(TENANT) as db:
+            db.execute('INSERT INTO jobs(tenant_id,id,revision_id,state,state_version,attempt_count,max_attempts,next_attempt_at) VALUES(?,?,?,?,?,?,?,?)',
+                       (TENANT, job_id, revision['id'], state, 7, attempts, 3, '2000-01-01T00:00:00Z'))
+        return job_id
+    running = fixture_job('RUNNING', 1)
+    before = dict(store.job(TENANT, running))
+    assert store.run_job(TENANT, running) == 'RUNNING'
+    assert dict(store.job(TENANT, running)) == before
+    for state in ('PENDING', 'FAILED_RETRYABLE'):
+        exhausted = fixture_job(state, 3)
+        assert store.run_job(TENANT, exhausted) == 'FAILED_TERMINAL'
+        final = store.job(TENANT, exhausted)
+        assert final['attempt_count'] == 3 and final['state_version'] == 8
+        assert final['last_error_code'] == 'MAX_ATTEMPTS_EXCEEDED'
+        assert final['next_attempt_at'] is None
+    pending = fixture_job('PENDING', 0)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        states = list(pool.map(lambda peer: peer.run_job(TENANT, pending), peers))
+    assert states == ['SUCCEEDED', 'SUCCEEDED']
+    assert store.job(TENANT, pending)['attempt_count'] == 1
+    assert store.job(TENANT, pending)['state_version'] == 9
     with ThreadPoolExecutor(max_workers=2) as pool:
         approvals=list(pool.map(lambda index:peers[index].approve(TENANT,revision['id'],revision['spec_sha'],1,USER),range(2)))
     assert sorted(result[1] for result in approvals)==['OK','STALE']

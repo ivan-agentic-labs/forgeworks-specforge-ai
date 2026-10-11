@@ -250,15 +250,25 @@ class Store:
 
     def run_job(self, tenant_id: str, job_id: str) -> str:
         with self.lock, self.conn() as db:
+            if isinstance(db, sqlite3.Connection):
+                db.execute("BEGIN IMMEDIATE")
             job = db.execute("SELECT * FROM jobs WHERE tenant_id=? AND id=?", (tenant_id, job_id)).fetchone()
             if not job:
                 return "NOT_FOUND"
-            if job["state"] in {"SUCCEEDED", "FAILED_TERMINAL", "CANCELLED"}:
+            if job["state"] not in {"PENDING", "FAILED_RETRYABLE"}:
                 return job["state"]
             if job["next_attempt_at"] and job["next_attempt_at"] > now():
                 return job["state"]
+            if int(job["attempt_count"]) >= int(job["max_attempts"]):
+                db.execute("UPDATE jobs SET state='FAILED_TERMINAL',state_version=state_version+1, "
+                           "next_attempt_at=NULL,last_error_code='MAX_ATTEMPTS_EXCEEDED', "
+                           "last_error_message='Retry budget exhausted',updated_at=? WHERE tenant_id=? AND id=?",
+                           (now(), tenant_id, job_id))
+                return "FAILED_TERMINAL"
             attempt = int(job["attempt_count"]) + 1
-            db.execute("UPDATE jobs SET state='RUNNING',attempt_count=?,state_version=state_version+1,updated_at=? WHERE tenant_id=? AND id=? AND state IN ('PENDING','FAILED_RETRYABLE')", (attempt, now(), tenant_id, job_id))
+            changed = db.execute("UPDATE jobs SET state='RUNNING',attempt_count=?,state_version=state_version+1,updated_at=? WHERE tenant_id=? AND id=? AND state IN ('PENDING','FAILED_RETRYABLE')", (attempt, now(), tenant_id, job_id)).rowcount
+            if changed != 1:
+                return db.execute("SELECT state FROM jobs WHERE tenant_id=? AND id=?", (tenant_id, job_id)).fetchone()["state"]
             revision = db.execute("SELECT * FROM revisions WHERE tenant_id=? AND id=?", (tenant_id, job["revision_id"])).fetchone()
             if not revision:
                 db.execute("UPDATE jobs SET state='FAILED_TERMINAL',state_version=state_version+1,last_error_code='REVISION_NOT_FOUND',updated_at=? WHERE tenant_id=? AND id=?", (now(), tenant_id, job_id))
