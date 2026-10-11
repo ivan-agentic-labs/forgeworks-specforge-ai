@@ -67,3 +67,46 @@ def test_missing_path_binding_fails_even_when_operation_exists():
     result = report(spec)
     assert result["valid"] is False
     assert any("path parameter mismatch" in error for error in result["errors"])
+
+
+def test_composite_path_template_matches_two_bound_parameters():
+    spec = valid_spec()
+    operation = spec["paths"].pop("/records/{record_id}")["get"]
+    operation["parameters"].append({
+        "name": "format", "in": "path", "required": True,
+        "schema": {"type": "string"},
+    })
+    spec["paths"]["/records/{record_id}.{format}"] = {"get": operation}
+    assert report(spec)["valid"] is True
+
+
+def test_indistinguishable_templated_paths_fail_closed():
+    spec = valid_spec()
+    additional = deepcopy(spec["paths"]["/records/{record_id}"]["get"])
+    additional["operationId"] = "getAlternateRecord"
+    additional["x-acceptance-case-ids"] = []
+    additional["x-requirement-id"] = None
+    additional["parameters"][0]["name"] = "name"
+    spec["paths"]["/records/{name}"] = {"get": additional}
+    result = report(spec)
+    assert result["valid"] is False
+    assert any("indistinguishable templated paths" in error for error in result["errors"])
+
+
+@pytest.mark.parametrize("path", ["/records/{record_id", "/records/record_id}", "/records/{}", "/records/{record_id}/{record_id}"])
+def test_malformed_or_repeated_path_template_is_rejected(path):
+    spec = valid_spec()
+    item = spec["paths"].pop("/records/{record_id}")
+    spec["paths"][path] = item
+    result = report(spec)
+    assert result["valid"] is False
+    assert any("path template" in error for error in result["errors"])
+
+
+def test_uppercase_operation_method_is_not_silently_accepted():
+    spec = valid_spec()
+    operation = spec["paths"]["/records/{record_id}"].pop("get")
+    spec["paths"]["/records/{record_id}"]["GET"] = operation
+    result = report(spec)
+    assert result["valid"] is False
+    assert any("unsupported path item GET" in error for error in result["errors"])
