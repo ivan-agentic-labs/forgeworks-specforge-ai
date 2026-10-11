@@ -11,6 +11,7 @@ from uuid import UUID
 
 import jwt
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
@@ -37,19 +38,19 @@ class Decision(BaseModel):
     model_config = ConfigDict(extra="forbid")
     decision_text: str = Field(min_length=1)
     source_reference: str = Field(min_length=1)
-    expected_version: int = Field(ge=1)
+    expected_version: int = Field(ge=1, strict=True)
 
 
 class Generate(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    source_version: int = Field(ge=1)
+    source_version: int = Field(ge=1, strict=True)
     output_profile: str = Field(min_length=1)
 
 
 class Approve(BaseModel):
     model_config = ConfigDict(extra="forbid")
     spec_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
-    expected_version: int = Field(ge=1)
+    expected_version: int = Field(ge=1, strict=True)
 
 
 class CreateUploadIntent(BaseModel):
@@ -153,6 +154,15 @@ def create_app(db_path: str | None = None, seed: bool = False):
             response = operation()
             store.idempotency_store(claims["tenant_id"], key, request_hash, response)
             return response
+
+    @app.exception_handler(RequestValidationError)
+    async def invalid_request(_, error: RequestValidationError):
+        # Do not echo raw input or attempt to serialize non-finite values.
+        return JSONResponse(status_code=422, content={
+            "type": "about:blank", "title": "Request rejected", "status": 422,
+            "code": "INVALID_REQUEST", "detail": "Request does not match the input contract",
+            "request_id": "runtime",
+        })
 
     @app.exception_handler(HTTPException)
     async def errors(_, exc):
