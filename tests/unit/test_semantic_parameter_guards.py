@@ -110,3 +110,26 @@ def test_uppercase_operation_method_is_not_silently_accepted():
     result = report(spec)
     assert result["valid"] is False
     assert any("unsupported path item GET" in error for error in result["errors"])
+
+
+def test_case_referenced_by_distinct_operations_is_not_valid_traceability():
+    spec = valid_spec()
+    second = deepcopy(spec["paths"]["/records/{record_id}"]["get"])
+    second["operationId"] = "updateRecord"
+    second["x-requirement-id"] = "req-2"
+    second["x-acceptance-case-ids"] = ["case-1", "case-2"]
+    spec["paths"]["/records/{record_id}"]["post"] = second
+    result = validate_generated_openapi(spec, {"req-1", "req-2"}, {"case-1", "case-2"})
+    assert result["valid"] is False
+    assert any("acceptance cases linked more than once: case-1" in error for error in result["errors"])
+
+
+def test_unique_case_to_operation_traceability_remains_accepted():
+    spec = valid_spec()
+    second = deepcopy(spec["paths"]["/records/{record_id}"]["get"])
+    second["operationId"] = "updateRecord"
+    second["x-requirement-id"] = "req-2"
+    second["x-acceptance-case-ids"] = ["case-2"]
+    spec["paths"]["/records/{record_id}"]["post"] = second
+    result = validate_generated_openapi(spec, {"req-1", "req-2"}, {"case-1", "case-2"})
+    assert result["valid"] is True, result["errors"]
