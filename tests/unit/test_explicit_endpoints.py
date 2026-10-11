@@ -44,3 +44,32 @@ def test_methods_can_share_exact_path():
 
 def test_root_path_is_supported():
     assert '/' in generate(['GET / -> 200 | readiness'])[0]
+
+
+def test_missing_or_extra_acceptance_case_does_not_silently_truncate_output():
+    _, requirements, cases = generate([
+        "GET /one -> 200 | First endpoint",
+        "GET /two -> 200 | Second endpoint",
+    ])
+    for changed in (cases[:-1], cases + [(str(uuid4()), str(uuid4()))]):
+        with pytest.raises(EndpointDeclarationError, match="EXPLICIT_ENDPOINT_CASE_ALIGNMENT_INVALID"):
+            explicit_paths(requirements, changed)
+
+
+def test_out_of_order_case_bindings_cannot_mislabel_operations():
+    _, requirements, cases = generate([
+        "GET /one -> 200 | First endpoint",
+        "GET /two -> 200 | Second endpoint",
+    ])
+    with pytest.raises(EndpointDeclarationError, match="EXPLICIT_ENDPOINT_CASE_ALIGNMENT_INVALID"):
+        explicit_paths(requirements, list(reversed(cases)))
+
+
+def test_duplicate_case_ids_cannot_appear_in_generated_traceability():
+    _, requirements, cases = generate([
+        "GET /one -> 200 | First endpoint",
+        "GET /two -> 200 | Second endpoint",
+    ])
+    duplicate = [(cases[0][0], cases[0][1]), (cases[0][0], cases[1][1])]
+    with pytest.raises(EndpointDeclarationError, match="EXPLICIT_ENDPOINT_CASE_DUPLICATE"):
+        explicit_paths(requirements, duplicate)
