@@ -294,7 +294,7 @@ def create_app(db_path: str | None = None, seed: bool = False):
         if body.kind != "source" or body.size_bytes > MAX_BYTES:
             reject(422 if body.kind != "source" else 413, "ARTIFACT_KIND_UNSUPPORTED" if body.kind != "source" else "ARTIFACT_TOO_LARGE", "Only source artifacts up to 1 MiB are accepted")
         row = store.create_artifact_intent(claims["tenant_id"], body.kind, body.filename, body.size_bytes, body.sha256, body.declared_media_type)
-        url, expires = artifacts.intent(claims["tenant_id"], claims["sub"], row["id"], "upload")
+        url, expires = artifacts.intent(claims["tenant_id"], claims["sub"], row["id"], "upload", session_id=claims.get("session_id"))
         return {"artifact_id": row["id"], "status": "INTENT_ISSUED", "upload_url": url, "expires_at": datetime.fromtimestamp(expires, timezone.utc).isoformat().replace("+00:00", "Z"), "required_headers": {"Content-Type": body.declared_media_type or "application/octet-stream", "X-Artifact-SHA256": body.sha256}}
 
     @app.post("/v1/artifacts/{artifact_id}/commit", status_code=201)
@@ -327,12 +327,27 @@ def create_app(db_path: str | None = None, seed: bool = False):
         if status == "NOT_AVAILABLE":
             reject(409, "ARTIFACT_NOT_AVAILABLE", "Artifact remains quarantined until validation")
         artifacts.verify(claims["tenant_id"], row["id"], row["object_generation"], row["sha256"], row["size_bytes"])
-        url, expires = artifacts.intent(claims["tenant_id"], claims["sub"], row["id"], "download", row["object_generation"])
+        url, expires = artifacts.intent(claims["tenant_id"], claims["sub"], row["id"], "download", row["object_generation"], session_id=claims.get("session_id"))
         return {"artifact_id": row["id"], "download_url": url, "expires_at": datetime.fromtimestamp(expires, timezone.utc).isoformat().replace("+00:00", "Z"), "object_generation": row["object_generation"]}
+
+    def verify_transfer_session(claims: dict) -> None:
+        # A signed bearer URL must not survive the Supabase user logging out.
+        # Synthetic development transfers do not carry Supabase sessions.
+        from specforge_ai.presentation.authentication import verify_session
+        if os.getenv("AUTH_MODE") == "supabase" and not claims.get("session_id"):
+            reject(403, "ARTIFACT_SESSION_REQUIRED", "A session-bound transfer capability is required")
+        if claims.get("session_id"):
+            verify_session(store, {
+                "_supabase_session": True,
+                "tenant_id": claims["tenant_id"],
+                "sub": claims["actor"],
+                "session_id": claims["session_id"],
+            })
 
     @app.put("/v1/artifact-transfers/{artifact_id}", status_code=201)
     async def upload_bytes(artifact_id: UUID, request: Request, token: str = Query(max_length=4096)):
         claims = artifacts.capability(token, str(artifact_id), "upload")
+        verify_transfer_session(claims)
         if not store.member(claims["tenant_id"], claims["actor"]):
             reject(403, "MEMBERSHIP_REVOKED", "Artifact capability owner is no longer an active member")
         row = store.artifact(claims["tenant_id"], str(artifact_id))
@@ -349,6 +364,7 @@ def create_app(db_path: str | None = None, seed: bool = False):
     @app.get("/v1/artifact-transfers/{artifact_id}")
     def download_bytes(artifact_id: UUID, token: str = Query(max_length=4096)):
         claims = artifacts.capability(token, str(artifact_id), "download")
+        verify_transfer_session(claims)
         if not store.member(claims["tenant_id"], claims["actor"]):
             reject(403, "MEMBERSHIP_REVOKED", "Artifact capability owner is no longer an active member")
         row = store.artifact(claims["tenant_id"], str(artifact_id))
