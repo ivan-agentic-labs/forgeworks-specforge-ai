@@ -133,3 +133,69 @@ def test_unique_case_to_operation_traceability_remains_accepted():
     spec["paths"]["/records/{record_id}"]["post"] = second
     result = validate_generated_openapi(spec, {"req-1", "req-2"}, {"case-1", "case-2"})
     assert result["valid"] is True, result["errors"]
+
+
+@pytest.mark.parametrize("omit", ["x-requirement-id", "x-acceptance-case-ids", "empty-cases"])
+def test_generated_operation_cannot_escape_requirement_and_case_traceability(omit):
+    spec = valid_spec()
+    # An additional generated endpoint must not escape provenance checks merely
+    # because all required IDs are already linked by another operation.
+    operation = {
+        "operationId": "untrackedOperation",
+        "responses": {"204": {"description": "No content"}},
+        "x-requirement-id": "req-2",
+        "x-acceptance-case-ids": ["case-2"],
+    }
+    if omit == "empty-cases":
+        operation["x-acceptance-case-ids"] = []
+    else:
+        operation.pop(omit)
+    spec["paths"]["/shadow"] = {"post": operation}
+    result = validate_generated_openapi(spec, {"req-1", "req-2"}, {"case-1", "case-2"})
+    assert result["valid"] is False, result
+    expected = ("x-requirement-id is required" if omit == "x-requirement-id"
+                else "at least one linked acceptance case is required")
+    assert any(expected in error for error in result["errors"]), result
+
+
+def test_all_generated_operations_with_unique_requirement_and_case_links_pass():
+    spec = valid_spec()
+    spec["paths"]["/shadow"] = {"post": {
+        "operationId": "trackedOperation",
+        "responses": {"201": {"description": "Created"}},
+        "x-requirement-id": "req-2",
+        "x-acceptance-case-ids": ["case-2"],
+    }}
+    result = validate_generated_openapi(spec, {"req-1", "req-2"}, {"case-1", "case-2"})
+    assert result["valid"] is True, result
+
+@pytest.mark.parametrize("omitted", ["x-requirement-id", "x-acceptance-case-ids", "empty"])
+def test_every_generated_operation_requires_trace_links(omitted):
+    spec = valid_spec()
+    extra = {
+        "operationId": "secondOperation",
+        "responses": {"204": {"description": "OK"}},
+        "x-requirement-id": "req-2",
+        "x-acceptance-case-ids": ["case-2"],
+    }
+    if omitted == "empty":
+        extra["x-acceptance-case-ids"] = []
+    else:
+        extra.pop(omitted)
+    spec["paths"]["/second"] = {"post": extra}
+    report = validate_generated_openapi(spec, {"req-1", "req-2"}, {"case-1", "case-2"})
+    assert report["valid"] is False
+    reason = "x-requirement-id is required" if omitted == "x-requirement-id" else "at least one linked acceptance case is required"
+    assert any(reason in error for error in report["errors"])
+
+
+def test_two_operations_with_distinct_trace_links_are_valid():
+    spec = valid_spec()
+    spec["paths"]["/second"] = {"post": {
+        "operationId": "secondOperation",
+        "responses": {"201": {"description": "Created"}},
+        "x-requirement-id": "req-2",
+        "x-acceptance-case-ids": ["case-2"],
+    }}
+    report = validate_generated_openapi(spec, {"req-1", "req-2"}, {"case-1", "case-2"})
+    assert report["valid"] is True, report
