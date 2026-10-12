@@ -82,7 +82,7 @@ def validate_generated_openapi(spec: dict[str, Any], requirement_ids: Iterable[s
     operation_ids: list[str] = []
     linked_requirements: list[str] = []
     linked_acceptance: list[str] = []
-    for path, item in sorted(paths.items()):
+    for path, item in sorted(paths.items(), key=lambda pair: str(pair[0])):
         if not isinstance(path, str) or not path.startswith("/"):
             errors.append(f"invalid path: {path!r}")
             continue
@@ -104,7 +104,10 @@ def validate_generated_openapi(spec: dict[str, Any], requirement_ids: Iterable[s
         if len(placeholders) != len(matches):
             errors.append(f"{path}: duplicate path template variable")
         path_params = _declared_path_parameters(item.get("parameters", []), path, errors)
-        for method, operation in sorted(item.items()):
+        for method, operation in sorted(item.items(), key=lambda pair: str(pair[0])):
+            if not isinstance(method, str):
+                errors.append(f"{path}: path item key must be a string")
+                continue
             if method.startswith("x-") or method in {"summary", "description", "parameters", "servers"}:
                 continue
             if method not in _METHODS:

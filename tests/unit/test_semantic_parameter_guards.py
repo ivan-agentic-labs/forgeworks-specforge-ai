@@ -227,3 +227,23 @@ def test_supported_response_keys_with_explicit_descriptions_are_valid(status):
     }
     report = validate_generated_openapi(spec, {"req-1"}, {"case-1"})
     assert report["valid"] is True, report
+
+
+@pytest.mark.parametrize("bad_key", [None, 200, False, ("dynamic",)])
+def test_nonstring_generated_path_keys_report_invalid_path_without_crashing(bad_key):
+    spec = valid_spec()
+    spec["paths"][bad_key] = {"get": {"operationId": "synthetic"}}
+    first = report(spec)
+    second = report(spec)
+    assert first == second
+    assert first["valid"] is False
+    assert any("invalid path:" in error for error in first["errors"])
+
+
+@pytest.mark.parametrize("bad_key", [None, 200, False, ("dynamic",)])
+def test_nonstring_generated_method_keys_fail_closed_not_server_error(bad_key):
+    spec = valid_spec()
+    spec["paths"]["/records/{record_id}"][bad_key] = {"operationId": "shadow"}
+    result = report(spec)
+    assert result["valid"] is False
+    assert any("path item key must be a string" in error for error in result["errors"])
