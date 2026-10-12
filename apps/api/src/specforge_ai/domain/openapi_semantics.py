@@ -121,6 +121,16 @@ def validate_generated_openapi(spec: dict[str, Any], requirement_ids: Iterable[s
             responses = operation.get("responses")
             if not isinstance(responses, dict) or not responses:
                 errors.append(f"{path} {method}: responses are required")
+            else:
+                for code, response in sorted(responses.items(), key=lambda part: str(part[0])):
+                    if not isinstance(code, str) or not (
+                        code == "default"
+                        or re.fullmatch(r"[1-5][0-9]{2}", code)
+                        or re.fullmatch(r"[1-5]XX", code)
+                    ):
+                        errors.append(f"{path} {method}: invalid response status {code!r}")
+                    if not isinstance(response, dict) or not isinstance(response.get("description"), str):
+                        errors.append(f"{path} {method}: response {code!r} requires a description")
             req_id = operation.get("x-requirement-id")
             if req_id is None:
                 errors.append(f"{path} {method}: x-requirement-id is required")
