@@ -73,3 +73,16 @@ def test_duplicate_case_ids_cannot_appear_in_generated_traceability():
     duplicate = [(cases[0][0], cases[0][1]), (cases[0][0], cases[1][1])]
     with pytest.raises(EndpointDeclarationError, match="EXPLICIT_ENDPOINT_CASE_DUPLICATE"):
         explicit_paths(requirements, duplicate)
+
+
+@pytest.mark.parametrize("hidden", [
+    "\u200b", "\u200d", "\u202e", "\u2066", "\u2028", "\u2029", "\ufeff", "\u0085",
+])
+def test_generated_requirement_summary_rejects_invisible_unicode_spoofing(hidden):
+    with pytest.raises(EndpointDeclarationError, match="EXPLICIT_ENDPOINT_DESCRIPTION_INVALID"):
+        generate(["GET /audit -> 200 | Reviewed" + hidden + "status"])
+
+
+def test_visible_non_ascii_human_summary_is_preserved():
+    paths, _, _ = generate(["GET /audit -> 200 | Résumé de l'audit"])
+    assert paths["/audit"]["get"]["summary"] == "Résumé de l'audit"
