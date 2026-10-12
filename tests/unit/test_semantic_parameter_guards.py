@@ -199,3 +199,31 @@ def test_two_operations_with_distinct_trace_links_are_valid():
     }}
     report = validate_generated_openapi(spec, {"req-1", "req-2"}, {"case-1", "case-2"})
     assert report["valid"] is True, report
+
+
+@pytest.mark.parametrize("status,response,reason", [
+    ("999", {"description": "impossible"}, "invalid response status"),
+    ("20", {"description": "short code"}, "invalid response status"),
+    ("200OK", {"description": "nonstandard"}, "invalid response status"),
+    ("6XX", {"description": "outside HTTP range"}, "invalid response status"),
+    ("200", {}, "requires a description"),
+    ("200", {"description": 42}, "requires a description"),
+    ("200", "malformed response", "requires a description"),
+    (200, {"description": "numeric key"}, "invalid response status"),
+])
+def test_invalid_response_declarations_are_reported_not_accepted(status,response,reason):
+    spec = valid_spec()
+    spec["paths"]["/records/{record_id}"]["get"]["responses"] = {status: response}
+    report = validate_generated_openapi(spec, {"req-1"}, {"case-1"})
+    assert report["valid"] is False, report
+    assert any(reason in error for error in report["errors"])
+
+
+@pytest.mark.parametrize("status", ["default", "200", "404", "2XX", "5XX"])
+def test_supported_response_keys_with_explicit_descriptions_are_valid(status):
+    spec = valid_spec()
+    spec["paths"]["/records/{record_id}"]["get"]["responses"] = {
+        status: {"description": ""}
+    }
+    report = validate_generated_openapi(spec, {"req-1"}, {"case-1"})
+    assert report["valid"] is True, report
