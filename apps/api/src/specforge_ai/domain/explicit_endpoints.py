@@ -1,5 +1,6 @@
 """Deterministic endpoint declarations; never infer schemas or stakeholder decisions."""
 import re
+import unicodedata
 
 LINE = re.compile(r"(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE) (\S+) -> ([1-5][0-9]{2}) \| (\S.*)")
 SEGMENT = r"(?:[A-Za-z0-9._~-]+|\{[A-Za-z][A-Za-z0-9_]*\})"
@@ -33,7 +34,10 @@ def explicit_paths(requirements, cases):
         method, path, status, description = match.groups()
         if not PATH.fullmatch(path) or any(segment in {".", ".."} for segment in path.split("/")):
             raise EndpointDeclarationError("EXPLICIT_ENDPOINT_PATH_INVALID")
-        if any(ord(char) < 32 or ord(char) == 127 for char in description):
+        # Keep source-to-OpenAPI reviewer labels visually auditable. Unicode
+        # bidi overrides, zero-width controls and separators can falsify the
+        # apparent endpoint semantics while preserving different raw bytes.
+        if any(unicodedata.category(char) in {"Cc", "Cf", "Cs", "Zl", "Zp"} for char in description):
             raise EndpointDeclarationError("EXPLICIT_ENDPOINT_DESCRIPTION_INVALID")
         template = re.sub(r"\{[^{}]+\}", "{}", path)
         if template in template_paths and template_paths[template] != path:
