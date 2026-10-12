@@ -122,13 +122,16 @@ def validate_generated_openapi(spec: dict[str, Any], requirement_ids: Iterable[s
             if not isinstance(responses, dict) or not responses:
                 errors.append(f"{path} {method}: responses are required")
             req_id = operation.get("x-requirement-id")
-            if req_id is not None:
-                if not isinstance(req_id, str) or req_id not in requirement_ids:
-                    errors.append(f"{path} {method}: unknown x-requirement-id")
-                else:
-                    linked_requirements.append(req_id)
-            case_ids = operation.get("x-acceptance-case-ids", [])
-            if not isinstance(case_ids, list) or any(not isinstance(case_id, str) or case_id not in acceptance_ids for case_id in case_ids):
+            if req_id is None:
+                errors.append(f"{path} {method}: x-requirement-id is required")
+            elif not isinstance(req_id, str) or req_id not in requirement_ids:
+                errors.append(f"{path} {method}: unknown x-requirement-id")
+            else:
+                linked_requirements.append(req_id)
+            case_ids = operation.get("x-acceptance-case-ids")
+            if not isinstance(case_ids, list) or not case_ids:
+                errors.append(f"{path} {method}: at least one linked acceptance case is required")
+            elif any(not isinstance(case_id, str) or case_id not in acceptance_ids for case_id in case_ids):
                 errors.append(f"{path} {method}: x-acceptance-case-ids contains an unknown case")
             elif len(set(case_ids)) != len(case_ids):
                 errors.append(f"{path} {method}: duplicate acceptance case reference")
