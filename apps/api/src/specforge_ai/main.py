@@ -136,6 +136,8 @@ def create_app(db_path: str | None = None, seed: bool = False):
         store.seed()
     app = FastAPI(title="SpecForge AI MVP", version="0.2.0")
     app.add_middleware(BodyBudgetMiddleware)
+    from specforge_ai.presentation.operations import register_operations
+    register_operations(app, ROOT, "specforge-ai")
     app.state.store = store
 
     def idempotent(claims, action: str, key: str | None, payload: dict, operation):

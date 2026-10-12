@@ -7,12 +7,20 @@ Traceable requirements-to-API specifications, review and acceptance tests.
 The first executable slice stores provenance-backed requirements, treats ambiguity as a blocking object, records stakeholder decisions, generates a deterministic OpenAPI revision, exposes traceability, and binds approval to an immutable digest/version. The static review console is served at `/` and calls only the explicit `/v1` API. No LLM provider is called.
 
 ## MVP run and test
+
 ```bash
-python -m pip install -e 'apps/api[test]'
+python -m pip install --require-hashes -r requirements-runtime.lock
+python -m pip install -e 'apps/api[test]' -r scripts/requirements-verification.txt
+export APP_ENV=development AUTH_MODE=development
+export AUTH_ISSUER=https://issuer.synthetic.invalid AUTH_AUDIENCE=forgeworks-api
+export DEV_AUTH_SECRET="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+export ARTIFACT_SIGNING_SECRET="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+python scripts/development_token.py
 SPECFORGE_SEED_FIXTURE=1 PYTHONPATH=apps/api/src uvicorn specforge_ai.main:app --reload
-python -W error -m pytest tests/integration
 ```
-The SQLite store and development issuer are test-only. See `docs/evidence/MVP_CHECKPOINT.md`. The browser UI's API base URL is configurable in its connection panel.
+
+The printed token lasts 15 minutes and belongs to the local synthetic tenant/user. Use a second terminal with the same explicit development environment to run python -W error -m pytest tests. Never enable fixtures or reuse the development token on hosted infrastructure or customer data.
+
 
 ## Documents
 - Product scope: `docs/product/PRODUCT_SCOPE.md`
@@ -33,7 +41,7 @@ python scripts/validate_openapi_independent.py
 CI runs on main and verifies the complete test tree, OpenAPI/event contracts, generated TypeScript client, implemented PostgreSQL MVP runtime, tenant RLS/concurrency and disposable logical backup/restore. These are scoped synthetic proofs; full G1-E and production operations remain open.
 
 ## Non-goals at this stage
-No production deployment, customer data, code-execution agent, public access, financial mutation, license assertion or fake passing tests.
+No production deployment, customer data, code-execution agent, customer production access, financial mutation, license assertion or fake passing tests.
 
 ## Governance
 The owner approved proceeding with GitHub bootstrap. Technical G1-E controls are still pending until their tests actually pass and evidence is reviewed. See `docs/governance/MASTER_G1_DECISION.md` for pre-approval baseline language; the owner approval is recorded here as a later decision.
@@ -52,3 +60,7 @@ The requirement flow now consumes actual integrity-checked UTF-8 source bytes. L
 ## Explicit source-declared APIs
 
 [Generate and download source-declared HTTP operations](docs/architecture/EXPLICIT_ENDPOINT_PROFILE.md) with the `openapi31-explicit-v1` profile. Method/path/status and traceability come from actual source declarations; schema and stakeholder acceptance remain open. [Scoped verification](docs/evidence/EXPLICIT_ENDPOINTS_2026-10-11.md).
+
+## Hosted release verification
+
+See [runtime identity, private telemetry and production acceptance](ops/runbooks/RUNTIME_RELEASE_VERIFICATION.md). Hosted releases expose a bounded source fingerprint and require a separate server-only metrics credential. Production startup requires separate infrastructure and an actual trusted, signed acceptance receipt. An unsigned template or passing synthetic CI does not establish production acceptance.
