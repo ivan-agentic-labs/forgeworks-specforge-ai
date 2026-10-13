@@ -477,7 +477,7 @@ paths:
   /v1/spec-revisions/{id}/traceability:
     get:
       operationId: get_v1_spec_revisions_id_traceability
-      summary: Return coverage counts and orphan operations
+      summary: Return linkage coverage ratios, counts and orphan operations
       security:
       - BearerAuth: []
       tags:
@@ -1250,14 +1250,36 @@ components:
         spec_sha256:
           type: string
           pattern: ^[0-9a-f]{64}$
+    CoverageMetric:
+      type: object
+      additionalProperties: false
+      description: Linkage numerator, denominator and ratio; ratio is 0 when the denominator is 0.
+      required:
+      - linked
+      - total
+      - ratio
+      properties:
+        linked:
+          type: integer
+          minimum: 0
+        total:
+          type: integer
+          minimum: 0
+        ratio:
+          type: number
+          minimum: 0
+          maximum: 1
     TraceabilityReport:
       type: object
       additionalProperties: false
+      description: Computed linkage evidence only; approval still requires full linkage and this report is not production or publication acceptance.
       required:
       - id
       - status
       - created_at
       - revision_id
+      - operation_coverage
+      - requirement_coverage
       - total_requirements
       - linked_requirements
       - unlinked_operation_ids
@@ -1277,6 +1299,10 @@ components:
         revision_id:
           type: string
           format: uuid
+        operation_coverage:
+          $ref: '#/components/schemas/CoverageMetric'
+        requirement_coverage:
+          $ref: '#/components/schemas/CoverageMetric'
         total_requirements:
           type: integer
         linked_requirements:
