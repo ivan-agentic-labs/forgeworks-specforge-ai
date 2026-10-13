@@ -234,18 +234,46 @@ class Store:
     @staticmethod
     def _trace_report(requirements: list[sqlite3.Row], spec: dict[str, Any], cases: list[tuple[str, str]], open_ambiguities: list[sqlite3.Row]) -> dict[str, Any]:
         operations = [(path, method, op) for path, item in spec.get("paths", {}).items() for method, op in item.items() if method in {"get", "post", "put", "patch", "delete", "head", "options", "trace"}]
-        linked = {op.get("x-requirement-id") for _, _, op in operations if op.get("x-requirement-id")}
-        operation_ids = {op.get("operationId") for _, _, op in operations}
-        linked_cases = {case_id for op in (op for _, _, op in operations) for case_id in op.get("x-acceptance-case-ids", [])}
+        requirement_ids = {requirement["id"] for requirement in requirements}
+        case_ids = {case[0] for case in cases}
+        linked: set[str] = set()
+        linked_cases: set[str] = set()
+        operation_ids: set[str] = set()
+        linked_operation_ids: set[str] = set()
+        linked_operations = 0
+        for _, _, operation in operations:
+            if not isinstance(operation, dict):
+                continue
+            operation_id = operation.get("operationId")
+            if isinstance(operation_id, str):
+                operation_ids.add(operation_id)
+            requirement_id = operation.get("x-requirement-id")
+            if isinstance(requirement_id, str) and requirement_id in requirement_ids:
+                linked.add(requirement_id)
+                linked_operations += 1
+                if isinstance(operation_id, str):
+                    linked_operation_ids.add(operation_id)
+            case_refs = operation.get("x-acceptance-case-ids", [])
+            if isinstance(case_refs, list):
+                linked_cases.update(case_id for case_id in case_refs if isinstance(case_id, str) and case_id in case_ids)
+        linked_requirement_count = len(linked & requirement_ids)
+        linked_case_count = len(linked_cases & case_ids)
+        total_operations = len(operations)
+        total_requirements = len(requirement_ids)
+        total_cases = len(case_ids)
+        operation_ratio = linked_operations / total_operations if total_operations else 0.0
+        requirement_ratio = linked_requirement_count / total_requirements if total_requirements else 0.0
         return {
-            "status": "VERIFIED" if linked == {r["id"] for r in requirements} and linked_cases == {case[0] for case in cases} and not open_ambiguities else "INCOMPLETE",
-            "total_requirements": len(requirements),
-            "linked_requirements": len(linked & {r["id"] for r in requirements}),
-            "unlinked_operation_ids": sorted(operation_ids - {op.get("operationId") for _, _, op in operations if op.get("x-requirement-id")} ),
+            "status": "VERIFIED" if total_operations > 0 and total_requirements > 0 and total_cases > 0 and linked_operations == total_operations and linked == requirement_ids and linked_cases == case_ids and not open_ambiguities else "INCOMPLETE",
+            "operation_coverage": {"linked": linked_operations, "total": total_operations, "ratio": operation_ratio},
+            "requirement_coverage": {"linked": linked_requirement_count, "total": total_requirements, "ratio": requirement_ratio},
+            "total_requirements": total_requirements,
+            "linked_requirements": linked_requirement_count,
+            "unlinked_operation_ids": sorted(operation_ids - linked_operation_ids),
             "critical_open_ambiguities": len(open_ambiguities),
-            "total_acceptance_cases": len(cases),
-            "linked_acceptance_cases": len(linked_cases & {case[0] for case in cases}),
-            "unlinked_acceptance_case_ids": sorted({case[0] for case in cases} - linked_cases),
+            "total_acceptance_cases": total_cases,
+            "linked_acceptance_cases": linked_case_count,
+            "unlinked_acceptance_case_ids": sorted(case_ids - linked_cases),
         }
 
     def run_job(self, tenant_id: str, job_id: str) -> str:
@@ -416,4 +444,3 @@ class Store:
         if artifact["status"] != "AVAILABLE":
             return artifact, "NOT_AVAILABLE"
         return artifact, "OK"
-

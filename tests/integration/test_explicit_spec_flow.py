@@ -52,6 +52,8 @@ def test_source_to_explicit_openapi_and_digest_verified_download(tmp_path):
         trace = client.get(f'/v1/spec-revisions/{rid}/traceability', headers=headers('spec:read')).json()
         assert trace['status'] == 'VERIFIED'
         assert trace['linked_requirements'] == trace['total_requirements'] == 3
+        assert trace['operation_coverage'] == {'linked': 3, 'total': 3, 'ratio': 1.0}
+        assert trace['requirement_coverage'] == {'linked': 3, 'total': 3, 'ratio': 1.0}
         assert client.get(f'/v1/spec-revisions/{rid}/openapi', headers=headers('requirements:read')).status_code == 403
         assert client.get(f'/v1/spec-revisions/{uuid4()}/openapi', headers=headers('spec:read')).status_code == 404
         other = str(uuid4())

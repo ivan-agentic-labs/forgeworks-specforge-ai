@@ -113,7 +113,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Return coverage counts and orphan operations */
+        /** Return linkage coverage ratios, counts and orphan operations */
         get: operations["get_v1_spec_revisions_id_traceability"];
         put?: never;
         post?: never;
@@ -304,6 +304,13 @@ export interface components {
             job_id: string;
             spec_sha256: string;
         };
+        /** @description Linkage numerator, denominator and ratio; ratio is 0 when the denominator is 0. */
+        CoverageMetric: {
+            linked: number;
+            total: number;
+            ratio: number;
+        };
+        /** @description Computed linkage evidence only; approval still requires full linkage and this report is not production or publication acceptance. */
         TraceabilityReport: {
             /** Format: uuid */
             id: string;
@@ -312,6 +319,8 @@ export interface components {
             created_at: string;
             /** Format: uuid */
             revision_id: string;
+            operation_coverage: components["schemas"]["CoverageMetric"];
+            requirement_coverage: components["schemas"]["CoverageMetric"];
             total_requirements: number;
             linked_requirements: number;
             unlinked_operation_ids: string[];
