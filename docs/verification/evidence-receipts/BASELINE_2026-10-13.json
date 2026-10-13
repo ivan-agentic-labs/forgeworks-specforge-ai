@@ -1,0 +1,78 @@
+{
+  "schema_version": "1.0",
+  "record_id": "specforge.baseline.2026-10-13",
+  "repository": "ivan-agentic-labs/forgeworks-specforge-ai",
+  "product": "SpecForge AI",
+  "record_type": "baseline_snapshot",
+  "recorded_on": "2026-10-14",
+  "evaluated_source_commit": "2d23e5ce472fa281fd70f133b5bf04d9f6ea8b91",
+  "gate_assessment": {
+    "g1_d": "CONDITIONAL_PENDING_SIGNOFF",
+    "g1_e": "PARTIAL_OPEN_BLOCKED",
+    "production_acceptance": "NOT_ACCEPTED"
+  },
+  "evidence": [
+    {
+      "kind": "application_ci",
+      "name": "SpecForge MVP Application CI",
+      "status": "PASS",
+      "run_id": "38428543423",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-specforge-ai/actions/runs/38428543423",
+      "environment": "CI",
+      "workflow_commit": "2d23e5ce472fa281fd70f133b5bf04d9f6ea8b91",
+      "subject_commit": "2d23e5ce472fa281fd70f133b5bf04d9f6ea8b91",
+      "subject_identity": "VERIFIED",
+      "scope": "Application test suite, independent OpenAPI validation, and configured SDK/browser checks for the exact checkout SHA.",
+      "limitations": ["CI success does not prove the unrun product test plan, authenticated customer acceptance, or production readiness."]
+    },
+    {
+      "kind": "contract_validation",
+      "name": "G1 Contract Verification",
+      "status": "PASS",
+      "run_id": "38428543141",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-specforge-ai/actions/runs/38428543141",
+      "environment": "CI",
+      "workflow_commit": "2d23e5ce472fa281fd70f133b5bf04d9f6ea8b91",
+      "subject_commit": "2d23e5ce472fa281fd70f133b5bf04d9f6ea8b91",
+      "subject_identity": "VERIFIED",
+      "scope": "Contract and event-schema verification on the exact checkout SHA.",
+      "limitations": ["This does not close the six SpecForge product test-plan scenarios or domain signoff."]
+    },
+    {
+      "kind": "postgres_runtime",
+      "name": "SpecForge PostgreSQL Runtime Proof",
+      "status": "PASS",
+      "run_id": "38428543127",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-specforge-ai/actions/runs/38428543127",
+      "environment": "DISPOSABLE",
+      "workflow_commit": "2d23e5ce472fa281fd70f133b5bf04d9f6ea8b91",
+      "subject_commit": "2d23e5ce472fa281fd70f133b5bf04d9f6ea8b91",
+      "subject_identity": "VERIFIED",
+      "scope": "Disposable PostgreSQL runtime proof for configured tenant/RLS and restore checks.",
+      "limitations": ["Disposable logical restore is not production PITR, regional failover, or RTO/RPO acceptance."]
+    },
+    {
+      "kind": "staging_readiness",
+      "name": "SpecForge staging public readiness smoke",
+      "status": "PASS",
+      "run_id": "38428543151",
+      "url": "https://github.com/ivan-agentic-labs/forgeworks-specforge-ai/actions/runs/38428543151",
+      "environment": "STAGING",
+      "workflow_commit": "2d23e5ce472fa281fd70f133b5bf04d9f6ea8b91",
+      "subject_commit": null,
+      "subject_identity": "UNKNOWN",
+      "scope": "Public health/readiness and anonymous protected-route denial checks against the staging endpoint.",
+      "limitations": ["The deployed service SHA is not proven by this smoke record.", "The smoke is not authenticated product or customer acceptance."]
+    }
+  ],
+  "limitations": [
+    "G1-D remains conditional/pending signoff and G1-E is partial/open/blocked; passing CI does not change those gates.",
+    "SF-T01 through SF-T06 are recorded as not run in the repository test plan at this baseline; these CI runs do not count as those product scenarios.",
+    "The staging smoke workflow commit does not identify the deployed application commit."
+  ],
+  "source_documents": [
+    {"path": "docs/verification/CURRENT_GATE_EVIDENCE.md", "url": "https://github.com/ivan-agentic-labs/forgeworks-specforge-ai/blob/2d23e5ce472fa281fd70f133b5bf04d9f6ea8b91/docs/verification/CURRENT_GATE_EVIDENCE.md"},
+    {"path": "docs/verification/DESIGN_GATE_STATUS.md", "url": "https://github.com/ivan-agentic-labs/forgeworks-specforge-ai/blob/2d23e5ce472fa281fd70f133b5bf04d9f6ea8b91/docs/verification/DESIGN_GATE_STATUS.md"},
+    {"path": "docs/verification/TEST_PLAN.md", "url": "https://github.com/ivan-agentic-labs/forgeworks-specforge-ai/blob/2d23e5ce472fa281fd70f133b5bf04d9f6ea8b91/docs/verification/TEST_PLAN.md"}
+  ]
+}
