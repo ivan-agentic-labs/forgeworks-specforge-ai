@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import sqlite3
 import tempfile
 import time
@@ -15,6 +16,11 @@ from fastapi import HTTPException
 
 MAX_BYTES = 1024 * 1024
 TTL = 300
+_SENSITIVE_SOURCE_PATTERNS = (
+    re.compile(r"(?im)^\s*(?:aws_secret_access_key|api[_-]?key|secret[_-]?key|password|token)\s*[:=]\s*\S+"),
+    re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
+    re.compile(r"\bsk-[A-Za-z0-9]{20,}\b"),
+)
 
 
 def reject(code: str, detail: str, status: int = 409):
@@ -127,6 +133,8 @@ class LocalArtifacts:
             reject("ARTIFACT_VALIDATION_FAILED", "Source must be valid UTF-8", 422)
         if "\x00" in text or not text.strip():
             reject("ARTIFACT_VALIDATION_FAILED", "Source must be non-empty text without NUL bytes", 422)
+        if any(pattern.search(text) for pattern in _SENSITIVE_SOURCE_PATTERNS):
+            reject("ARTIFACT_SENSITIVE_DATA", "Source contains a credential-like value and cannot be published", 422)
         if media_type == "application/json":
             def unique_object(pairs):
                 result = {}

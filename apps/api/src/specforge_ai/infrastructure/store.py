@@ -55,7 +55,7 @@ class Store:
                 CREATE TABLE IF NOT EXISTS requirements(tenant_id TEXT, id TEXT, set_id TEXT, statement TEXT, source_span TEXT, req_type TEXT, provenance_digest TEXT, PRIMARY KEY(tenant_id,id));
                 CREATE TABLE IF NOT EXISTS ambiguities(tenant_id TEXT, id TEXT, requirement_id TEXT, severity TEXT, question TEXT, status TEXT, version INTEGER NOT NULL DEFAULT 1, PRIMARY KEY(tenant_id,id));
                 CREATE TABLE IF NOT EXISTS decisions(tenant_id TEXT, id TEXT, ambiguity_id TEXT, actor_id TEXT, decision_hash TEXT, source_reference TEXT, decision_text TEXT NOT NULL DEFAULT '', version INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL DEFAULT '');
-                CREATE TABLE IF NOT EXISTS revisions(tenant_id TEXT, id TEXT, set_id TEXT, source_version INTEGER, status TEXT, spec_json TEXT, spec_sha TEXT, version INTEGER, source_decision_digest TEXT NOT NULL DEFAULT '', validator_report_json TEXT NOT NULL DEFAULT '{}', validator_report_sha TEXT NOT NULL DEFAULT '', traceability_report_json TEXT NOT NULL DEFAULT '{}', traceability_report_sha TEXT NOT NULL DEFAULT '', stale_reason TEXT, created_at TEXT NOT NULL DEFAULT '', approved_at TEXT, approver_id TEXT, PRIMARY KEY(tenant_id,id));
+                CREATE TABLE IF NOT EXISTS revisions(tenant_id TEXT, id TEXT, set_id TEXT, source_version INTEGER, source_digest TEXT NOT NULL DEFAULT '', status TEXT, spec_json TEXT, spec_sha TEXT, version INTEGER, source_decision_digest TEXT NOT NULL DEFAULT '', validator_report_json TEXT NOT NULL DEFAULT '{}', validator_report_sha TEXT NOT NULL DEFAULT '', traceability_report_json TEXT NOT NULL DEFAULT '{}', traceability_report_sha TEXT NOT NULL DEFAULT '', stale_reason TEXT, created_at TEXT NOT NULL DEFAULT '', approved_at TEXT, approver_id TEXT, PRIMARY KEY(tenant_id,id));
                 CREATE TABLE IF NOT EXISTS acceptance_cases(tenant_id TEXT, id TEXT, revision_id TEXT, requirement_id TEXT, case_key TEXT, description TEXT, status TEXT, PRIMARY KEY(tenant_id,id));
                 CREATE TABLE IF NOT EXISTS jobs(tenant_id TEXT, id TEXT, revision_id TEXT, state TEXT, created_at TEXT, state_version INTEGER NOT NULL DEFAULT 1, attempt_count INTEGER NOT NULL DEFAULT 0, max_attempts INTEGER NOT NULL DEFAULT 3, next_attempt_at TEXT, last_error_code TEXT, last_error_message TEXT, updated_at TEXT NOT NULL DEFAULT '', PRIMARY KEY(tenant_id,id));
                 CREATE TABLE IF NOT EXISTS artifacts(tenant_id TEXT, id TEXT, kind TEXT, filename TEXT, declared_media_type TEXT, sha256 TEXT, size_bytes INTEGER, status TEXT, object_generation TEXT, created_at TEXT, expires_at TEXT, rejected_reason TEXT, PRIMARY KEY(tenant_id,id));
@@ -65,7 +65,7 @@ class Store:
             self._ensure_columns(db, "ambiguities", {"version": "INTEGER NOT NULL DEFAULT 1"})
             self._ensure_columns(db, "decisions", {"decision_text": "TEXT NOT NULL DEFAULT ''", "version": "INTEGER NOT NULL DEFAULT 1", "created_at": "TEXT NOT NULL DEFAULT ''"})
             self._ensure_columns(db, "revisions", {
-                "source_decision_digest": "TEXT NOT NULL DEFAULT ''", "validator_report_json": "TEXT NOT NULL DEFAULT '{}'",
+                "source_digest": "TEXT NOT NULL DEFAULT ''", "source_decision_digest": "TEXT NOT NULL DEFAULT ''", "validator_report_json": "TEXT NOT NULL DEFAULT '{}'",
                 "validator_report_sha": "TEXT NOT NULL DEFAULT ''", "traceability_report_json": "TEXT NOT NULL DEFAULT '{}'",
                 "traceability_report_sha": "TEXT NOT NULL DEFAULT ''", "stale_reason": "TEXT", "created_at": "TEXT NOT NULL DEFAULT ''",
                 "approved_at": "TEXT", "approver_id": "TEXT",
@@ -223,7 +223,7 @@ class Store:
             report_sha = sha256_json(report)
             trace_sha = sha256_json(trace)
             created = now()
-            db.execute("INSERT INTO revisions(tenant_id,id,set_id,source_version,status,spec_json,spec_sha,version,source_decision_digest,validator_report_json,validator_report_sha,traceability_report_json,traceability_report_sha,stale_reason,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (tenant_id, revision_id, set_id, source_version, "GENERATED" if report["valid"] else "VALIDATION_FAILED", raw_spec, spec_sha, 1, snapshot, canonical_json(report), report_sha, canonical_json(trace), trace_sha, None, created))
+            db.execute("INSERT INTO revisions(tenant_id,id,set_id,source_version,source_digest,status,spec_json,spec_sha,version,source_decision_digest,validator_report_json,validator_report_sha,traceability_report_json,traceability_report_sha,stale_reason,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (tenant_id, revision_id, set_id, source_version, requirement_set["source_digest"], "GENERATED" if report["valid"] else "VALIDATION_FAILED", raw_spec, spec_sha, 1, snapshot, canonical_json(report), report_sha, canonical_json(trace), trace_sha, None, created))
             for case_id, requirement_id in cases:
                 db.execute("INSERT INTO acceptance_cases VALUES(?,?,?,?,?,?,?)", (tenant_id, case_id, revision_id, requirement_id, f"{revision_id}:{requirement_id}", "Verify the source-declared HTTP operation and response; schema and behavior require stakeholder acceptance." if profile == "openapi31-explicit-v1" else "The generated operation satisfies the source requirement with a successful response.", "PENDING"))
             db.execute("INSERT INTO jobs(tenant_id,id,revision_id,state,created_at,state_version,attempt_count,max_attempts,next_attempt_at,last_error_code,last_error_message,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)", (tenant_id, job_id, revision_id, "PENDING", created, 1, 0, 3, created, None, None, created))
@@ -356,7 +356,7 @@ class Store:
                 return revision, "DIGEST_MISMATCH"
             requirement_set = db.execute("SELECT * FROM sets_ WHERE tenant_id=? AND id=?", (tenant_id, revision["set_id"])).fetchone()
             current_snapshot = self._decision_snapshot(db, tenant_id, revision["set_id"])
-            if revision["status"] == "STALE" or revision["source_decision_digest"] != current_snapshot or revision["source_version"] != requirement_set["source_version"]:
+            if revision["status"] == "STALE" or revision["source_decision_digest"] != current_snapshot or revision["source_version"] != requirement_set["source_version"] or revision["source_digest"] != requirement_set["source_digest"]:
                 db.execute("UPDATE revisions SET status='STALE',stale_reason='SOURCE_SNAPSHOT_CHANGED',version=version+1 WHERE tenant_id=? AND id=?", (tenant_id, revision_id))
                 db.execute("UPDATE acceptance_cases SET status='INVALIDATED' WHERE tenant_id=? AND revision_id=?", (tenant_id, revision_id))
                 return db.execute("SELECT * FROM revisions WHERE tenant_id=? AND id=?", (tenant_id, revision_id)).fetchone(), "STALE"
