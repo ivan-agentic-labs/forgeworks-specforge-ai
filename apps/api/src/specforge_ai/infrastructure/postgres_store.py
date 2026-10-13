@@ -15,6 +15,7 @@ from uuid import UUID, uuid4
 
 import psycopg
 from psycopg.rows import dict_row
+from psycopg_pool import ConnectionPool
 
 from specforge_ai.infrastructure.security_catalog import verify_tenant_catalog
 from specforge_ai.infrastructure.store import Store
@@ -63,6 +64,10 @@ class Connection:
             statement = statement.replace("INSERT OR IGNORE INTO", "INSERT INTO", 1) + " ON CONFLICT DO NOTHING"
         statement = statement.replace("?", "%s")
         try:
+            # Reads and SET LOCAL do not require a write savepoint. Read errors
+            # roll back the owning transaction before the pool reuses a connection.
+            if statement.lstrip().upper().startswith(("SELECT ", "SET ")):
+                return Cursor(self.connection.execute(statement, parameters))
             # A savepoint preserves SQLite's recoverable statement-failure semantics.
             with self.connection.transaction():
                 cursor = self.connection.execute(statement, parameters)
@@ -101,6 +106,19 @@ class PostgresStore(Store):
             verify_tenant_catalog(db)
             if not db.execute("SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='requirement_sets' AND column_name='version'").fetchone():
                 raise ValueError("Apply migration 002 with the migration role before starting runtime")
+
+        self._pool = ConnectionPool(
+            dsn, kwargs={"row_factory": dict_row, "connect_timeout": 5,
+                         "prepare_threshold": None},
+            min_size=1, max_size=4, timeout=5, max_waiting=16,
+            open=False, name="specforge-ai-runtime",
+        )
+
+    def start_pool(self):
+        self._pool.open(wait=True, timeout=8)
+
+    def close(self):
+        self._pool.close()
 
     @tenant_method
     def session_active(self, tenant, user, session_id):
@@ -144,10 +162,11 @@ class PostgresStore(Store):
                 raise ValueError("Nested transaction cannot change store or tenant")
             yield active[2]
             return
-        with psycopg.connect(self.dsn, row_factory=dict_row, connect_timeout=5) as db:
+        self._pool.open()
+        with self._pool.connection() as db:
             db.execute("SET LOCAL ROLE fw_specforge_ai_rw")
             db.execute("SELECT set_config('app.tenant_id', %s, true)", (tenant,))
-            # Conservative serialization for this low-volume adapter. No pooling.
+            # Retain per-tenant serialization across reused connections.
             db.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", (tenant,))
             connection = Connection(db)
             token = ACTIVE_CONNECTION.set((id(self), tenant, connection))

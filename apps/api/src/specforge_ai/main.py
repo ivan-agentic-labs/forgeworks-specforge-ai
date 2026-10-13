@@ -4,6 +4,7 @@ from specforge_ai.presentation.authentication import decode_bearer, verify_sessi
 import json
 import hashlib
 import os
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated
@@ -134,7 +135,19 @@ def create_app(db_path: str | None = None, seed: bool = False):
         artifacts = LocalArtifacts(Path(os.getenv("SPECFORGE_ARTIFACT_ROOT", str(Path(local_db_path).parent / "artifacts"))))
     if seed:
         store.seed()
-    app = FastAPI(title="SpecForge AI MVP", version="0.2.0")
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        start_pool = getattr(store, "start_pool", None)
+        if start_pool:
+            start_pool()
+        try:
+            yield
+        finally:
+            close_store = getattr(store, "close", None)
+            if close_store:
+                close_store()
+
+    app = FastAPI(title="SpecForge AI MVP", version="0.2.0", lifespan=lifespan)
     app.add_middleware(BodyBudgetMiddleware)
     from specforge_ai.presentation.operations import register_operations
     register_operations(app, ROOT, "specforge-ai")
