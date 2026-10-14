@@ -51,6 +51,11 @@ class ObjectStorage:
             reject("STORAGE_NOT_CONFIGURED",503)
         if not re.fullmatch(r"[a-z0-9-]+",product) or not re.fullmatch(r"[a-z0-9-]+",self.region):
             reject("STORAGE_NOT_CONFIGURED",503)
+        # Supabase S3 project credentials must not cross product/environment buckets.
+        if self.prefix:
+            environment=os.environ.get("APP_ENV","development")
+            if environment in {"staging","production"} and self.bucket != f"fw-{environment}-{product}":
+                reject("STORAGE_NOT_CONFIGURED",503)
         self.host=parsed.hostname
         self.opener=urllib.request.build_opener(NoRedirect())
 
