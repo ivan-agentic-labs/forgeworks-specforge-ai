@@ -2,36 +2,37 @@
   "schema": "forgeworks-staging-release-v1",
   "product": "specforge-ai",
   "environment": "staging",
-  "revision_sha": "a3bc64744783877c17be163275bef34a229457df",
+  "revision_sha": "25b52f8b28eddcb373c06ceac6e98358a1be8533",
   "runtime_manifest": {
     "profile": "forgeworks-runtime-manifest-v1",
     "file_count": 34,
-    "sha256": "22593726136cb1e33276310faec818afd63a652c2663633cc9b12fad27ae664f"
+    "sha256": "2a17fd8dcb4a9452893e9e6c5f1c66081254711d5454f8d1bdca05e92c9cb4d0"
   },
   "railway_project_id": "1b35f35d-ad5b-4b93-ad20-ed68251b4589",
   "railway_environment_id": "0395e7ac-10f8-4004-8bb7-ddee901343c7",
   "railway_service_id": "db8b6012-8d48-4cd0-802c-225db1b0a19e",
-  "deployment_id": "4cdaecb3-d963-4d31-a850-53466ae454af",
+  "deployment_id": "3d515c15-1e15-4437-902d-4654f1ec0394",
   "deployment_status": "SUCCESS",
-  "observed_at": "2026-10-14T06:57:52Z",
+  "observed_at": "2026-10-14T07:26:21Z",
   "ci_urls": [
     "https://github.com/ivan-agentic-labs/forgeworks-specforge-ai/actions/runs/38518465293",
     "https://github.com/ivan-agentic-labs/forgeworks-apishield-agent/actions/runs/38521516802",
-    "https://github.com/ivan-agentic-labs/forgeworks-apishield-agent/actions/runs/38525437249"
+    "https://github.com/ivan-agentic-labs/forgeworks-apishield-agent/actions/runs/38525437249",
+    "https://github.com/ivan-agentic-labs/forgeworks-apishield-agent/actions/runs/38528406231"
   ],
   "hosted_probe": {
     "result": "PASS",
-    "scope": "Exact five-product public staging identity, readiness and anonymous access boundaries",
-    "proof_url": "https://github.com/ivan-agentic-labs/forgeworks-apishield-agent/actions/runs/38525437249",
+    "scope": "Exact five-product staging revision, selected runtime fingerprint, health/readiness, anonymous business/metrics denial",
+    "proof_url": "https://github.com/ivan-agentic-labs/forgeworks-apishield-agent/actions/runs/38528406231",
     "private_metrics": "NOT_VERIFIED",
     "authenticated_tenant": "NOT_VERIFIED",
-    "observed_at": "2026-10-14T06:57:52Z"
+    "observed_at": "2026-10-14T07:26:21Z"
   },
   "production_acceptance": "NOT_ACCEPTED",
   "rollback": {
-    "previous_revision_sha": "314a239aee667808c612ebb79294ebe760ac7c77",
-    "previous_deployment_id": "54acea65-bcc7-47e8-a07c-4b259c65565f",
-    "notes": "Pin previous source SHA and corresponding release SHA together; database migration rollback requires separate review."
+    "previous_revision_sha": "a3bc64744783877c17be163275bef34a229457df",
+    "previous_deployment_id": "4cdaecb3-d963-4d31-a850-53466ae454af",
+    "notes": "Restore matching tested revision and deployment; schema and object data require independent rollback. Non-current deployment may need an explicit redeploy."
   },
   "limits": [
     "No authenticated cross-tenant or real business integration acceptance",
