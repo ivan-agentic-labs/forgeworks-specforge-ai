@@ -101,3 +101,42 @@ def test_canonical_s3_endpoint_remains_valid(monkeypatch):
         monkeypatch.setenv(key, value)
     monkeypatch.setenv("S3_ENDPOINT", "https://storage.example.invalid")
     assert ObjectStorage("specforge-ai").host == "storage.example.invalid"
+
+
+def test_supabase_s3_hosted_path_style_signing(monkeypatch):
+    values = {
+        "S3_ENDPOINT": "https://fljekuwplgkrpdoajyhn.storage.supabase.co/storage/v1/s3",
+        "S3_BUCKET": "fw-staging-specforge-ai",
+        "S3_REGION": "ap-northeast-2",
+        "S3_URL_STYLE": "path",
+        "S3_ACCESS_KEY_ID": "synthetic-access-key",
+        "S3_SECRET_ACCESS_KEY": "synthetic-secret-for-offline-tests",
+    }
+    for k,v in values.items():
+        monkeypatch.setenv(k,v)
+    store = ObjectStorage("specforge-ai")
+    req = store.signed_request("PUT", "specforge-ai/artifact", b"bytes",
+                               datetime(2026,10,14,tzinfo=timezone.utc))
+    assert req.full_url == (
+        "https://fljekuwplgkrpdoajyhn.storage.supabase.co/storage/v1/s3/"
+        "fw-staging-specforge-ai/specforge-ai/artifact"
+    )
+    assert "20261014/ap-northeast-2/s3/aws4_request" in req.get_header("Authorization")
+    assert req.get_header("X-amz-content-sha256") == hashlib.sha256(b"bytes").hexdigest()
+
+
+@pytest.mark.parametrize("endpoint,style", [
+    ("https://untrusted.example.invalid/storage/v1/s3", "path"),
+    ("https://fljekuwplgkrpdoajyhn.storage.supabase.co/storage/v1/s3/extra", "path"),
+    ("https://fljekuwplgkrpdoajyhn.storage.supabase.co/storage/v1/s3", "virtual-host"),
+    ("https://fljekuwplgkrpdoajyhn.storage.supabase.co/%73torage/v1/s3", "path"),
+    ("https://x.supabase.co/storage/v1/s3", "path"),
+])
+def test_supabase_s3_origin_must_not_be_caller_defined(monkeypatch,endpoint,style):
+    for k,v in {"S3_BUCKET":"fw-staging-specforge-ai","S3_REGION":"ap-northeast-2",
+                "S3_ACCESS_KEY_ID":"synthetic-access","S3_SECRET_ACCESS_KEY":"synthetic-secret",
+                "S3_URL_STYLE":style,"S3_ENDPOINT":endpoint}.items():
+        monkeypatch.setenv(k,v)
+    with pytest.raises(HTTPException) as error:
+        ObjectStorage("specforge-ai")
+    assert error.value.status_code==503
