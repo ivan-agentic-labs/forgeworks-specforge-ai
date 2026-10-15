@@ -45,6 +45,9 @@ def _declared_path_parameters(raw: Any, location: str, errors: list[str]) -> set
         if not isinstance(name, str) or not name or not isinstance(scope, str):
             errors.append(f"{prefix} requires a name and location")
             continue
+        if scope not in {"query", "header", "path", "cookie"}:
+            errors.append(f"{prefix}: unsupported parameter location {scope!r}")
+            continue
         identity = (scope, name)
         if identity in seen:
             errors.append(f"{location}: duplicate parameter {scope}:{name}")
