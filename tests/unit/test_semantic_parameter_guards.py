@@ -247,3 +247,21 @@ def test_nonstring_generated_method_keys_fail_closed_not_server_error(bad_key):
     result = report(spec)
     assert result["valid"] is False
     assert any("path item key must be a string" in error for error in result["errors"])
+
+
+@pytest.mark.parametrize("invalid_location", ["body", "formData", "matrix", ""])
+def test_openapi_parameter_location_must_be_supported(invalid_location):
+    spec = valid_spec()
+    spec["paths"]["/records/{record_id}"]["get"]["parameters"][0]["in"] = invalid_location
+    result = report(spec)
+    assert result["valid"] is False
+    assert any("unsupported parameter location" in error for error in result["errors"])
+
+
+def test_supported_query_parameter_does_not_need_a_path_placeholder():
+    spec = valid_spec()
+    spec["paths"]["/records/{record_id}"]["get"]["parameters"].append({
+        "name": "include", "in": "query", "schema": {"type": "string"},
+    })
+    result = report(spec)
+    assert result["valid"] is True, result["errors"]
