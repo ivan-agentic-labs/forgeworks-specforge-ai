@@ -67,7 +67,11 @@ def validate_generated_openapi(spec: dict[str, Any], requirement_ids: Iterable[s
 
     if not isinstance(spec, dict):
         return _report(["document must be an object"])
-    if spec.get("openapi") not in {"3.1.0", "3.1.1", "3.1.2"}:
+    # A generated model can return any JSON type, including an array/object
+    # here. Guard the type before set membership (otherwise unhashable inputs
+    # escape as TypeError instead of a deterministic validation report).
+    version = spec.get("openapi")
+    if not isinstance(version, str) or version not in {"3.1.0", "3.1.1", "3.1.2"}:
         errors.append("openapi must be a supported 3.1 version")
     if not isinstance(spec.get("info"), dict) or not spec["info"].get("title") or not spec["info"].get("version"):
         errors.append("info.title and info.version are required")
