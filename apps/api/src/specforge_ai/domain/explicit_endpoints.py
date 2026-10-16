@@ -25,6 +25,12 @@ def explicit_paths(requirements, cases):
         raise EndpointDeclarationError("EXPLICIT_ENDPOINT_CASE_ALIGNMENT_INVALID")
     if len({case[0] for case in cases}) != len(cases):
         raise EndpointDeclarationError("EXPLICIT_ENDPOINT_CASE_DUPLICATE")
+    # operationId and x-requirement-id are durable traceability bindings.
+    # Reusing a requirement ID on two distinct routes can create duplicate
+    # operationIds even when each path/method pair is individually valid.
+    ids = [requirement["id"] for requirement in requirements]
+    if len(set(ids)) != len(ids):
+        raise EndpointDeclarationError("EXPLICIT_ENDPOINT_REQUIREMENT_DUPLICATE")
     paths, template_paths = {}, {}
     for requirement, (case_id, _) in zip(requirements, cases):
         statement = requirement["statement"]
