@@ -96,3 +96,13 @@ def test_distinct_path_parameters_preserve_complete_bindings():
     paths, _, _ = generate(["GET /customers/{customer_id}/orders/{order_id} -> 200 | View order"])
     params = paths["/customers/{customer_id}/orders/{order_id}"]["get"]["parameters"]
     assert [parameter["name"] for parameter in params] == ["customer_id", "order_id"]
+
+def test_duplicate_requirement_ids_never_generate_duplicate_operation_ids():
+    _, requirements, cases = generate([
+        "GET /customers -> 200 | List customers",
+        "POST /orders -> 201 | Create order",
+    ])
+    duplicated = [{**requirements[0]}, {**requirements[1], "id": requirements[0]["id"]}]
+    aligned = [(cases[0][0], duplicated[0]["id"]), (cases[1][0], duplicated[1]["id"])]
+    with pytest.raises(EndpointDeclarationError, match="EXPLICIT_ENDPOINT_REQUIREMENT_DUPLICATE"):
+        explicit_paths(duplicated, aligned)
