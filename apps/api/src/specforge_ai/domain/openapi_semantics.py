@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import hashlib
+import math
 import re
 from collections import Counter
 from typing import Any, Iterable
@@ -61,6 +62,27 @@ def _declared_path_parameters(raw: Any, location: str, errors: list[str]) -> set
     return names
 
 
+def _invalid_json_scalar(value: Any) -> str | None:
+    """Reject hidden non-JSON numbers and invalid Unicode in generated evidence."""
+    pending = [(value, 0)]
+    nodes = 0
+    while pending:
+        item, depth = pending.pop()
+        nodes += 1
+        if nodes > 20000 or depth > 32:
+            return "generated document exceeds structural validation budget"
+        if isinstance(item, float) and not math.isfinite(item):
+            return "generated document contains nonfinite JSON numbers"
+        if isinstance(item, str) and any(0xD800 <= ord(char) <= 0xDFFF for char in item):
+            return "generated document contains unpaired Unicode surrogates"
+        if isinstance(item, dict):
+            pending.extend((k, depth + 1) for k in item)
+            pending.extend((v, depth + 1) for v in item.values())
+        elif isinstance(item, list):
+            pending.extend((v, depth + 1) for v in item)
+    return None
+
+
 def validate_generated_openapi(spec: dict[str, Any], requirement_ids: Iterable[str], acceptance_ids: Iterable[str]) -> dict[str, Any]:
     """Return a stable report for structural and requirement trace semantics."""
     requirement_ids = set(requirement_ids)
@@ -70,6 +92,9 @@ def validate_generated_openapi(spec: dict[str, Any], requirement_ids: Iterable[s
 
     if not isinstance(spec, dict):
         return _report(["document must be an object"])
+    scalar_error = _invalid_json_scalar(spec)
+    if scalar_error:
+        return _report([scalar_error])
     # A generated model can return any JSON type, including an array/object
     # here. Guard the type before set membership (otherwise unhashable inputs
     # escape as TypeError instead of a deterministic validation report).
@@ -189,7 +214,7 @@ def validate_generated_openapi(spec: dict[str, Any], requirement_ids: Iterable[s
 
 
 def canonical_json(value: Any) -> str:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False)
 
 
 def sha256_json(value: Any) -> str:
