@@ -106,3 +106,12 @@ def test_duplicate_requirement_ids_never_generate_duplicate_operation_ids():
     aligned = [(cases[0][0], duplicated[0]["id"]), (cases[1][0], duplicated[1]["id"])]
     with pytest.raises(EndpointDeclarationError, match="EXPLICIT_ENDPOINT_REQUIREMENT_DUPLICATE"):
         explicit_paths(duplicated, aligned)
+
+def test_distinct_source_ids_cannot_collapse_to_same_openapi_operation_id():
+    requirements = [
+        {"id": "ab-c", "statement": "GET /customer -> 200 | Find customer"},
+        {"id": "abc", "statement": "POST /orders -> 201 | Add order"},
+    ]
+    cases = [("acceptance-a", "ab-c"), ("acceptance-b", "abc")]
+    with pytest.raises(EndpointDeclarationError, match="EXPLICIT_ENDPOINT_OPERATION_ID_COLLISION"):
+        explicit_paths(requirements, cases)
