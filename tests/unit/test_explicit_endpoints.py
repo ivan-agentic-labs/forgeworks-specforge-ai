@@ -86,3 +86,13 @@ def test_generated_requirement_summary_rejects_invisible_unicode_spoofing(hidden
 def test_visible_non_ascii_human_summary_is_preserved():
     paths, _, _ = generate(["GET /audit -> 200 | Résumé de l'audit"])
     assert paths["/audit"]["get"]["summary"] == "Résumé de l'audit"
+
+def test_repeated_path_parameter_cannot_be_silently_deduplicated():
+    with pytest.raises(EndpointDeclarationError, match="EXPLICIT_ENDPOINT_PATH_PARAMETER_REPEATED"):
+        generate(["GET /customers/{id}/orders/{id} -> 200 | Conflicting path parameter identity"])
+
+
+def test_distinct_path_parameters_preserve_complete_bindings():
+    paths, _, _ = generate(["GET /customers/{customer_id}/orders/{order_id} -> 200 | View order"])
+    params = paths["/customers/{customer_id}/orders/{order_id}"]["get"]["parameters"]
+    assert [parameter["name"] for parameter in params] == ["customer_id", "order_id"]
