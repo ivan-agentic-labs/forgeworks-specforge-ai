@@ -51,7 +51,10 @@ def explicit_paths(requirements, cases):
                      "x-requirement-id": requirement["id"], "x-acceptance-case-ids": [case_id],
                      "x-source-declaration": statement, "x-schema-review-required": True,
                      "responses": {status: {"description": description}}}
-        names = list(dict.fromkeys(re.findall(r"\{([^{}]+)\}", path)))
+        extracted_names = re.findall(r"\{([^{}]+)\}", path)
+        names = list(dict.fromkeys(extracted_names))
+        if len(names) != len(extracted_names):
+            raise EndpointDeclarationError("EXPLICIT_ENDPOINT_PATH_PARAMETER_REPEATED")
         if names:
             operation["parameters"] = [{"name": name, "in": "path", "required": True, "schema": {}, "description": "Schema intentionally unspecified; stakeholder review is required."} for name in names]
         item[method] = operation
