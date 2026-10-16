@@ -289,3 +289,42 @@ def test_openapi_info_trimmed_values_are_still_valid():
     spec = valid_spec()
     spec["info"] = {"title": " API Specification ", "version": " 1.0 "}
     assert report(spec)["valid"] is True
+
+
+@pytest.mark.parametrize("invalid,reason", [
+    (float("nan"), "nonfinite JSON numbers"),
+    (float("inf"), "nonfinite JSON numbers"),
+    (-float("inf"), "nonfinite JSON numbers"),
+    (chr(0xD800), "unpaired Unicode surrogates"),
+    (chr(0xDFFF), "unpaired Unicode surrogates"),
+])
+def test_generated_nested_non_json_values_fail_semantic_validation(invalid, reason):
+    spec = valid_spec()
+    spec["paths"]["/records/{record_id}"]["get"]["x-provider-evidence"] = {
+        "nested": [{"value": invalid}]
+    }
+    first = report(spec)
+    assert first["valid"] is False, first
+    assert any(reason in error for error in first["errors"])
+    assert first == report(spec)
+
+
+@pytest.mark.parametrize("invalid", [float("nan"), float("inf"), -float("inf")])
+def test_canonical_json_and_signed_digest_never_encode_nonfinite_numbers(invalid):
+    from specforge_ai.domain.openapi_semantics import canonical_json, sha256_json
+    payload = {"generated": {"unsafe": invalid}}
+    with pytest.raises(ValueError):
+        canonical_json(payload)
+    with pytest.raises(ValueError):
+        sha256_json(payload)
+
+
+def test_semantic_document_excessive_nested_depth_fails_without_recursion():
+    spec = valid_spec()
+    value = "leaf"
+    for _ in range(35):
+        value = [value]
+    spec["paths"]["/records/{record_id}"]["get"]["x-provider-evidence"] = value
+    result = report(spec)
+    assert result["valid"] is False
+    assert any("structural validation budget" in error for error in result["errors"])
