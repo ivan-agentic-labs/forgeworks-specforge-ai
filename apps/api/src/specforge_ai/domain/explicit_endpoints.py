@@ -31,7 +31,7 @@ def explicit_paths(requirements, cases):
     ids = [requirement["id"] for requirement in requirements]
     if len(set(ids)) != len(ids):
         raise EndpointDeclarationError("EXPLICIT_ENDPOINT_REQUIREMENT_DUPLICATE")
-    paths, template_paths = {}, {}
+    paths, template_paths, operation_ids = {}, {}, set()
     for requirement, (case_id, _) in zip(requirements, cases):
         statement = requirement["statement"]
         match = LINE.fullmatch(statement)
@@ -53,7 +53,11 @@ def explicit_paths(requirements, cases):
         method = method.lower()
         if method in item:
             raise EndpointDeclarationError("EXPLICIT_ENDPOINT_DUPLICATE")
-        operation = {"operationId": "requirement_" + requirement["id"].replace("-", ""), "summary": description,
+        operation_id = "requirement_" + requirement["id"].replace("-", "")
+        if operation_id in operation_ids:
+            raise EndpointDeclarationError("EXPLICIT_ENDPOINT_OPERATION_ID_COLLISION")
+        operation_ids.add(operation_id)
+        operation = {"operationId": operation_id, "summary": description,
                      "x-requirement-id": requirement["id"], "x-acceptance-case-ids": [case_id],
                      "x-source-declaration": statement, "x-schema-review-required": True,
                      "responses": {status: {"description": description}}}
