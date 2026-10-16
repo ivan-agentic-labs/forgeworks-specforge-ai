@@ -76,8 +76,12 @@ def validate_generated_openapi(spec: dict[str, Any], requirement_ids: Iterable[s
     version = spec.get("openapi")
     if not isinstance(version, str) or version not in {"3.1.0", "3.1.1", "3.1.2"}:
         errors.append("openapi must be a supported 3.1 version")
-    if not isinstance(spec.get("info"), dict) or not spec["info"].get("title") or not spec["info"].get("version"):
-        errors.append("info.title and info.version are required")
+    info = spec.get("info")
+    if (not isinstance(info, dict) or any(
+        not isinstance(info.get(field), str) or not info[field].strip()
+        for field in ("title", "version")
+    )):
+        errors.append("info.title and info.version must be nonempty strings")
     paths = spec.get("paths")
     if not isinstance(paths, dict) or not paths:
         errors.append("paths must contain at least one path")
