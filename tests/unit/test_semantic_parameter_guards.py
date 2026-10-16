@@ -265,3 +265,27 @@ def test_supported_query_parameter_does_not_need_a_path_placeholder():
     })
     result = report(spec)
     assert result["valid"] is True, result["errors"]
+
+
+@pytest.mark.parametrize("field,invalid", [
+    ("title", {"translated": "Not a string"}),
+    ("title", ["list"]),
+    ("title", 42),
+    ("title", "   "),
+    ("version", {"v": "1"}),
+    ("version", 1),
+    ("version", False),
+    ("version", ""),
+])
+def test_openapi_info_title_and_version_require_nonempty_strings(field, invalid):
+    spec = valid_spec()
+    spec["info"][field] = invalid
+    result = report(spec)
+    assert result["valid"] is False, result
+    assert any("info.title and info.version" in err for err in result["errors"])
+
+
+def test_openapi_info_trimmed_values_are_still_valid():
+    spec = valid_spec()
+    spec["info"] = {"title": " API Specification ", "version": " 1.0 "}
+    assert report(spec)["valid"] is True
