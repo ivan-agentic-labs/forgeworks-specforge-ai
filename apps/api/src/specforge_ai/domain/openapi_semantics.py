@@ -76,10 +76,18 @@ def _invalid_json_scalar(value: Any) -> str | None:
         if isinstance(item, str) and any(0xD800 <= ord(char) <= 0xDFFF for char in item):
             return "generated document contains unpaired Unicode surrogates"
         if isinstance(item, dict):
-            pending.extend((k, depth + 1) for k in item)
+            # Path/method keys receive their own diagnostic below. Still
+            # reject surrogate keys without allowing Python-only values.
+            for key in item:
+                if isinstance(key, str) and any(0xD800 <= ord(char) <= 0xDFFF for char in key):
+                    return "generated document contains unpaired Unicode surrogates"
             pending.extend((v, depth + 1) for v in item.values())
         elif isinstance(item, list):
             pending.extend((v, depth + 1) for v in item)
+        elif type(item) not in (str, int, float, bool, type(None)):
+            # Provider adapters can accidentally supply bytes, Decimal, tuples
+            # or datetimes. They are not JSON and must never reach signing.
+            return "generated document contains non-JSON values"
     return None
 
 
