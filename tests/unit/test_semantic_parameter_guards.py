@@ -328,3 +328,12 @@ def test_semantic_document_excessive_nested_depth_fails_without_recursion():
     result = report(spec)
     assert result["valid"] is False
     assert any("structural validation budget" in error for error in result["errors"])
+
+
+@pytest.mark.parametrize("invalid", [b"secret", ("unexpected",), {"not-json"}])
+def test_python_only_nested_values_are_rejected_before_serialization(invalid):
+    spec = valid_spec()
+    spec["paths"]["/records/{record_id}"]["get"]["x-provider-evidence"] = invalid
+    result = report(spec)
+    assert result["valid"] is False
+    assert any("non-JSON values" in error for error in result["errors"])
