@@ -115,3 +115,21 @@ def test_distinct_source_ids_cannot_collapse_to_same_openapi_operation_id():
     cases = [("acceptance-a", "ab-c"), ("acceptance-b", "abc")]
     with pytest.raises(EndpointDeclarationError, match="EXPLICIT_ENDPOINT_OPERATION_ID_COLLISION"):
         explicit_paths(requirements, cases)
+
+
+@pytest.mark.parametrize("requirements,cases,error", [
+    (None, [], "EXPLICIT_ENDPOINT_INPUT_INVALID"),
+    ([None], [("case", "req")], "EXPLICIT_ENDPOINT_INPUT_INVALID"),
+    ([{"id": [], "statement": "GET /health -> 200 | Health"}],
+     [("case", "req")], "EXPLICIT_ENDPOINT_INPUT_INVALID"),
+    ([{"id": "req"}], [("case", "req")], "EXPLICIT_ENDPOINT_INPUT_INVALID"),
+    ([{"id": "req", "statement": "GET /health -> 200 | Health"}],
+     [([], "req")], "EXPLICIT_ENDPOINT_CASE_ALIGNMENT_INVALID"),
+    ([{"id": "req", "statement": "GET /health -> 200 | Health"}],
+     [("case", ["req"])], "EXPLICIT_ENDPOINT_CASE_ALIGNMENT_INVALID"),
+    ([{"id": "req", "statement": "GET /health -> 200 | Health"}],
+     [None], "EXPLICIT_ENDPOINT_CASE_ALIGNMENT_INVALID"),
+])
+def test_malformed_requirement_and_case_identities_fail_with_domain_error(requirements, cases, error):
+    with pytest.raises(EndpointDeclarationError, match=error):
+        explicit_paths(requirements, cases)
