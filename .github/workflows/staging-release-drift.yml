@@ -30,3 +30,26 @@ jobs:
           if not result["record_is_current"]:
               print("::warning::GitHub HEAD is newer than the reviewed staging release; hosted acceptance of HEAD is NOT established")
           PY
+
+      - name: Observe current public staged runtime identity without credentials
+        env:
+          BASE_URL: https://specforge-ai-staging.up.railway.app
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --max-time 20 --connect-timeout 8 --max-filesize 4096 \
+            "$BASE_URL/versionz" > current-hosted-version.json
+          python - <<'PY'
+          import json
+          import re
+          from pathlib import Path
+          item = json.loads(Path("current-hosted-version.json").read_text())
+          manifest = item.get("runtime_manifest")
+          assert set(item) == {"product", "environment", "revision_sha", "runtime_manifest"}
+          assert item["product"] == "specforge-ai" and item["environment"] == "staging"
+          assert re.fullmatch(r"[a-f0-9]{40}", item["revision_sha"])
+          assert isinstance(manifest, dict) and manifest.get("profile") == "forgeworks-runtime-manifest-v1"
+          assert type(manifest.get("file_count")) is int and 0 < manifest["file_count"] <= 256
+          assert re.fullmatch(r"[a-f0-9]{64}", manifest.get("sha256", ""))
+          # Identifiers are public release metadata, not tokens or user data.
+          print(json.dumps(item, sort_keys=True))
+          PY
