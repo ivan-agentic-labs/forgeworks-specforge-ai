@@ -12,6 +12,22 @@ class EndpointDeclarationError(ValueError):
 
 
 def explicit_paths(requirements, cases):
+    # The input can originate from parsed project artifacts. Reject malformed
+    # identities at this boundary rather than crashing during hashing,
+    # indexing or OpenAPI serialization with an unhandled TypeError.
+    if not isinstance(requirements, (list, tuple)) or not isinstance(cases, (list, tuple)):
+        raise EndpointDeclarationError("EXPLICIT_ENDPOINT_INPUT_INVALID")
+    for requirement in requirements:
+        if (not isinstance(requirement, dict)
+                or not isinstance(requirement.get("id"), str)
+                or not requirement["id"]
+                or not isinstance(requirement.get("statement"), str)):
+            raise EndpointDeclarationError("EXPLICIT_ENDPOINT_INPUT_INVALID")
+    for case in cases:
+        if (not isinstance(case, (list, tuple)) or len(case) != 2
+                or not isinstance(case[0], str) or not case[0]
+                or not isinstance(case[1], str) or not case[1]):
+            raise EndpointDeclarationError("EXPLICIT_ENDPOINT_CASE_ALIGNMENT_INVALID")
     # Never silently discard requirements via zip() or attach another
     # requirement's acceptance case to an emitted operation.
     if len(requirements) != len(cases):
