@@ -2,18 +2,18 @@
   "schema": "forgeworks-staging-release-v1",
   "product": "specforge-ai",
   "environment": "staging",
-  "revision_sha": "c377289aafd2b8379f0830993b51d9545411bd8e",
+  "revision_sha": "fd94f1cf689c8162da896a8afb3fac1e9ee180f0",
   "runtime_manifest": {
     "file_count": 34,
     "profile": "forgeworks-runtime-manifest-v1",
-    "sha256": "70aead341112e25eb49382b0729a7080d01374fee3e387a480067942b6dedfd5"
+    "sha256": "21d3df820e45f8fb7c03bf3733a97b666b945621fbeb1773891419651d16f86e"
   },
   "railway_project_id": "1b35f35d-ad5b-4b93-ad20-ed68251b4589",
   "railway_environment_id": "0395e7ac-10f8-4004-8bb7-ddee901343c7",
   "railway_service_id": "db8b6012-8d48-4cd0-802c-225db1b0a19e",
-  "deployment_id": "b193722a-7ee5-4378-8377-588f2d8e0917",
+  "deployment_id": "a429e919-4745-4522-bc28-1938e2eac7a7",
   "deployment_status": "SUCCESS",
-  "observed_at": "2026-10-17T08:31:02Z",
+  "observed_at": "2026-10-17T11:50:05Z",
   "ci_urls": [
     "https://github.com/ivan-agentic-labs/forgeworks-specforge-ai/actions/runs/38518465293",
     "https://github.com/ivan-agentic-labs/forgeworks-apishield-agent/actions/runs/38521516802",
@@ -21,21 +21,24 @@
     "https://github.com/ivan-agentic-labs/forgeworks-apishield-agent/actions/runs/38528406231",
     "https://github.com/ivan-agentic-labs/forgeworks-apishield-agent/actions/runs/38531680241",
     "https://github.com/ivan-agentic-labs/forgeworks-apishield-agent/actions/runs/38533777988",
-    "https://github.com/ivan-agentic-labs/forgeworks-specforge-ai/actions/runs/39015484276"
+    "https://github.com/ivan-agentic-labs/forgeworks-specforge-ai/actions/runs/39015484276",
+    "https://github.com/ivan-agentic-labs/forgeworks-specforge-ai/actions/runs/39030119347",
+    "https://github.com/ivan-agentic-labs/forgeworks-specforge-ai/actions/runs/39030119291",
+    "https://github.com/ivan-agentic-labs/forgeworks-specforge-ai/actions/runs/39030190369"
   ],
   "hosted_probe": {
     "result": "PASS",
-    "scope": "Observed staging /healthz, /readyz, exact /versionz, and anonymous /metricsz denial; business and private metrics not tested",
-    "proof_url": "https://github.com/ivan-agentic-labs/forgeworks-apishield-agent/actions/runs/39010764090/attempts/2",
+    "scope": "Staging /healthz, /readyz, versionz exact revision and manifest, and anonymous /metricsz denial; authenticated business acceptance not tested",
+    "proof_url": "https://github.com/ivan-agentic-labs/forgeworks-specforge-ai/actions/runs/39030190369",
     "private_metrics": "NOT_VERIFIED",
     "authenticated_tenant": "NOT_VERIFIED",
-    "observed_at": "2026-10-17T08:31:02Z"
+    "observed_at": "2026-10-17T11:50:05Z"
   },
   "production_acceptance": "NOT_ACCEPTED",
   "rollback": {
-    "previous_revision_sha": "cc27bc23f764f4dbbc53e41689029da24e819179",
-    "previous_deployment_id": "3d99b0c6-0bb3-4210-a58d-6d47050c2e36",
-    "notes": "Historical release reference only. Availability of prior Railway deployment and database/object rollback are NOT_VERIFIED."
+    "previous_revision_sha": "c377289aafd2b8379f0830993b51d9545411bd8e",
+    "previous_deployment_id": "b193722a-7ee5-4378-8377-588f2d8e0917",
+    "notes": "Historical release reference only. Prior deployment availability and data rollback remain NOT_VERIFIED."
   },
   "limits": [
     "Public staging identity/readiness and anonymous metrics boundary verified; no authenticated cross-tenant business acceptance",
