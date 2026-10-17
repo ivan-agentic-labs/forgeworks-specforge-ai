@@ -18,10 +18,15 @@ def explicit_paths(requirements, cases):
     if not isinstance(requirements, (list, tuple)) or not isinstance(cases, (list, tuple)):
         raise EndpointDeclarationError("EXPLICIT_ENDPOINT_INPUT_INVALID")
     for requirement in requirements:
-        if (not isinstance(requirement, dict)
-                or not isinstance(requirement.get("id"), str)
-                or not requirement["id"]
-                or not isinstance(requirement.get("statement"), str)):
+        # Persisted requirements are sqlite3.Row objects (mapping-like but
+        # not dict). Accept them without weakening the field-type checks.
+        try:
+            requirement_id = requirement["id"]
+            statement = requirement["statement"]
+        except (KeyError, IndexError, TypeError, AttributeError):
+            raise EndpointDeclarationError("EXPLICIT_ENDPOINT_INPUT_INVALID") from None
+        if (not isinstance(requirement_id, str) or not requirement_id
+                or not isinstance(statement, str)):
             raise EndpointDeclarationError("EXPLICIT_ENDPOINT_INPUT_INVALID")
     for case in cases:
         if (not isinstance(case, (list, tuple)) or len(case) != 2
